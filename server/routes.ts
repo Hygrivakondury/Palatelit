@@ -9,6 +9,7 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES } from "@shared/schema";
 import { seedRecipes } from "./seed";
+import { sendContributionEmail } from "./email";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -146,6 +147,12 @@ export async function registerRoutes(
 
       const recipe = await storage.createRecipe(body);
       res.status(201).json(recipe);
+
+      const source = req.body.challengeId ? "challenge" : "community";
+      const recipientEmail = user.email;
+      if (recipientEmail) {
+        sendContributionEmail(recipientEmail, body.submittedByName, recipe.title, source).catch(() => {});
+      }
     } catch (err) {
       console.error("Error creating recipe:", err);
       res.status(500).json({ message: "Failed to create recipe" });
@@ -691,6 +698,11 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
       const slug = recipeData.title.toLowerCase().replace(/[^a-z0-9]+/g, "+");
       const youtubeUrl = `https://www.youtube.com/results?search_query=${slug}+recipe+indian+vegetarian`;
 
+      const submittedByName =
+        `${req.user.claims.first_name || ""} ${req.user.claims.last_name || ""}`.trim() ||
+        req.user.claims.email?.split("@")[0] ||
+        "Community Member";
+
       const newRecipe = await storage.createRecipe({
         title: recipeData.title,
         description: recipeData.description || "",
@@ -702,14 +714,19 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
         cuisineType: recipeData.cuisineType || "Pan-Indian",
         dietaryTags: Array.isArray(recipeData.dietaryTags) ? recipeData.dietaryTags : [],
         youtubeUrl,
-        isUserSubmitted: false,
+        isUserSubmitted: true,
         authorId: req.user.claims.sub,
-        submittedBy: req.user.claims.email,
-        submittedByName:
-          `${req.user.claims.first_name || ""} ${req.user.claims.last_name || ""}`.trim() || "Smart Chef AI",
+        submittedBy: req.user.claims.sub,
+        submittedByName,
+        submittedByImage: req.user.claims.profile_image_url ?? null,
       });
 
       res.json({ recipe: newRecipe, alreadyExists: false });
+
+      const recipientEmail = req.user.claims.email;
+      if (recipientEmail) {
+        sendContributionEmail(recipientEmail, submittedByName, newRecipe.title, "chatbot").catch(() => {});
+      }
     } catch (err) {
       console.error("Save recipe from chat error:", err);
       res.status(500).json({ message: "Failed to save recipe" });

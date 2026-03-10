@@ -32,7 +32,7 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100">Community Recipes</h2>
         <p className="text-neutral-500 text-sm mt-1">
-          Recipes created by our community — click chat to connect with the chef!
+          Recipes contributed by our community — via the recipe form, Weekly Challenge, or Smart Chef AI.
         </p>
       </div>
 
