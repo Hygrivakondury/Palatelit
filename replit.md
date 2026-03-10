@@ -22,6 +22,12 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
+- **Tab Navigation**: Three-tab layout (Recipes / Community / Weekly Challenge) with desktop tab bar + mobile bottom navigation bar
+- **Weekly Challenge**: Admin creates weekly cooking challenges with a suggested dish; users submit full recipes (title, description, ingredients, instructions, photo, cuisine type, dietary tags) that auto-appear in the global recipe library; first logged-in user can claim admin rights
+- **Community Recipes**: Dedicated Community tab showing all user-submitted recipes with author info; each card has View (opens recipe modal) and Chat buttons
+- **Community Chat**: Per-recipe chat window where users can message the recipe author and other cooks — for questions like "where do I find this ingredient?" etc.
+- **User Recipe Library**: Submitted recipes appear in both the global recipe library (Recipes tab) and the submitter's personal library (visible in Weekly Challenge tab)
+- **Admin System**: First-claim admin model — first user to click "Claim Admin" gets admin rights; admin can create/end challenges; admin badge shown in user menu
 - **Green & Gold theme**: Professional, elegant design using Open Sans + Lora fonts
 
 ## Project Structure

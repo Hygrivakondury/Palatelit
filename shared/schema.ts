@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -19,6 +19,11 @@ export const recipes = pgTable("recipes", {
   dietaryTags: text("dietary_tags").array().notNull().default([]),
   imageUrl: text("image_url"),
   authorId: varchar("author_id"),
+  submittedBy: varchar("submitted_by"),
+  submittedByName: text("submitted_by_name"),
+  submittedByImage: text("submitted_by_image"),
+  isUserSubmitted: boolean("is_user_submitted").notNull().default(false),
+  challengeId: integer("challenge_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -37,6 +42,33 @@ export const reviews = pgTable("reviews", {
   rating: integer("rating").notNull().default(5),
   authorName: text("author_name"),
   authorImageUrl: text("author_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const challenges = pgTable("challenges", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  suggestedDish: text("suggested_dish").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const communityMessages = pgTable("community_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  recipeId: integer("recipe_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
+  senderName: text("sender_name"),
+  senderImageUrl: text("sender_image_url"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userProfiles = pgTable("user_profiles", {
+  userId: varchar("user_id").primaryKey(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  displayName: text("display_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -68,6 +100,20 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({
   rating: z.number().int().min(1).max(5),
 });
 
+export const insertChallengeSchema = createInsertSchema(challenges).omit({
+  id: true,
+  createdAt: true,
+  createdBy: true,
+});
+
+export const insertCommunityMessageSchema = createInsertSchema(communityMessages).omit({
+  id: true,
+  createdAt: true,
+  senderId: true,
+  senderName: true,
+  senderImageUrl: true,
+});
+
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type Recipe = typeof recipes.$inferSelect;
 
@@ -75,6 +121,14 @@ export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
 
 export type Favorite = typeof favorites.$inferSelect;
+
+export type Challenge = typeof challenges.$inferSelect;
+export type InsertChallenge = z.infer<typeof insertChallengeSchema>;
+
+export type CommunityMessage = typeof communityMessages.$inferSelect;
+export type InsertCommunityMessage = z.infer<typeof insertCommunityMessageSchema>;
+
+export type UserProfile = typeof userProfiles.$inferSelect;
 
 export const CUISINE_TYPES = [
   "North Indian",

@@ -6,7 +6,7 @@ import multer from "multer";
 import OpenAI from "openai";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { insertRecipeSchema, insertReviewSchema } from "@shared/schema";
+import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES } from "@shared/schema";
 import { seedRecipes } from "./seed";
 
 const openai = new OpenAI({
@@ -19,7 +19,7 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const upload = multer({
   dest: uploadDir,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     cb(null, allowed.includes(file.mimetype));
@@ -55,24 +55,53 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/recipes/community", async (_req, res) => {
+    try {
+      const communityRecipes = await storage.getCommunityRecipes();
+      res.json(communityRecipes);
+    } catch (err) {
+      console.error("Error fetching community recipes:", err);
+      res.status(500).json({ message: "Failed to fetch community recipes" });
+    }
+  });
+
+  app.get("/api/recipes/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const myRecipes = await storage.getUserRecipes(userId);
+      res.json(myRecipes);
+    } catch (err) {
+      console.error("Error fetching user recipes:", err);
+      res.status(500).json({ message: "Failed to fetch your recipes" });
+    }
+  });
+
   app.get("/api/recipes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid recipe ID" });
       const recipe = await storage.getRecipe(id);
       if (!recipe) return res.status(404).json({ message: "Recipe not found" });
       res.json(recipe);
     } catch (err) {
-      console.error("Error fetching recipe:", err);
       res.status(500).json({ message: "Failed to fetch recipe" });
     }
   });
 
   app.post("/api/recipes", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertRecipeSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      const recipe = await storage.createRecipe({ ...parsed.data, authorId: req.user.claims.sub });
+      const user = req.user.claims;
+      const userId = user.sub;
+
+      const body = {
+        ...req.body,
+        submittedBy: userId,
+        submittedByName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email || "Community Member",
+        submittedByImage: user.profile_image_url ?? null,
+        isUserSubmitted: true,
+        authorId: userId,
+      };
+
+      const recipe = await storage.createRecipe(body);
       res.status(201).json(recipe);
     } catch (err) {
       console.error("Error creating recipe:", err);
@@ -80,23 +109,14 @@ export async function registerRoutes(
     }
   });
 
-  // ─── IMAGE UPLOAD ─────────────────────────────────────────────
-  app.post("/api/recipes/:id/upload-image", isAuthenticated, upload.single("image"), async (req: any, res) => {
+  app.post("/api/recipes/:id/image", isAuthenticated, upload.single("image"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid recipe ID" });
-      if (!req.file) return res.status(400).json({ message: "No image file provided" });
-
-      // Rename to use original extension
-      const ext = path.extname(req.file.originalname) || ".jpg";
-      const newName = `recipe-${id}-${Date.now()}${ext}`;
-      const newPath = path.join(uploadDir, newName);
-      fs.renameSync(req.file.path, newPath);
-
-      const imageUrl = `/uploads/${newName}`;
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const imageUrl = `/uploads/${req.file.filename}`;
       const updated = await storage.updateRecipeImage(id, imageUrl);
       if (!updated) return res.status(404).json({ message: "Recipe not found" });
-      res.json({ imageUrl, recipe: updated });
+      res.json(updated);
     } catch (err) {
       console.error("Error uploading image:", err);
       res.status(500).json({ message: "Failed to upload image" });
@@ -114,21 +134,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
+  app.post("/api/favorites", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const recipeId = parseInt(req.params.id);
-      const isFav = await storage.isFavorited(userId, recipeId);
-      res.json({ favorited: isFav });
-    } catch (err) {
-      res.status(500).json({ message: "Failed to check favorite" });
-    }
-  });
-
-  app.post("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const recipeId = parseInt(req.params.id);
+      const { recipeId } = req.body;
+      if (!recipeId) return res.status(400).json({ message: "recipeId required" });
+      const already = await storage.isFavorited(userId, recipeId);
+      if (already) return res.status(409).json({ message: "Already favorited" });
       const fav = await storage.addFavorite(userId, recipeId);
       res.status(201).json(fav);
     } catch (err) {
@@ -136,12 +148,12 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/favorites/:recipeId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const recipeId = parseInt(req.params.id);
+      const recipeId = parseInt(req.params.recipeId);
       await storage.removeFavorite(userId, recipeId);
-      res.json({ success: true });
+      res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to remove favorite" });
     }
@@ -151,9 +163,8 @@ export async function registerRoutes(
   app.get("/api/recipes/:id/reviews", async (req, res) => {
     try {
       const recipeId = parseInt(req.params.id);
-      if (isNaN(recipeId)) return res.status(400).json({ message: "Invalid recipe ID" });
-      const recipeReviews = await storage.getReviewsByRecipe(recipeId);
-      res.json(recipeReviews);
+      const reviewList = await storage.getReviewsByRecipe(recipeId);
+      res.json(reviewList);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch reviews" });
     }
@@ -162,26 +173,140 @@ export async function registerRoutes(
   app.post("/api/recipes/:id/reviews", isAuthenticated, async (req: any, res) => {
     try {
       const recipeId = parseInt(req.params.id);
-      if (isNaN(recipeId)) return res.status(400).json({ message: "Invalid recipe ID" });
-      const parsed = insertReviewSchema.safeParse({ ...req.body, recipeId, userId: req.user.claims.sub });
-      if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      const user = req.user.claims;
+      const parsed = insertReviewSchema.safeParse({ ...req.body, userId: user.sub, recipeId });
+      if (!parsed.success) return res.status(400).json({ message: "Invalid review data" });
 
-      // Fetch author info
-      const { authStorage } = await import("./replit_integrations/auth");
-      const user = await authStorage.getUser(req.user.claims.sub);
-      const authorName = user?.firstName
-        ? `${user.firstName} ${user.lastName ?? ""}`.trim()
+      const authorName = user.first_name
+        ? `${user.first_name} ${user.last_name ?? ""}`.trim()
         : user?.email ?? "Anonymous";
 
       const review = await storage.addReview({
         ...parsed.data,
         authorName,
-        authorImageUrl: user?.profileImageUrl ?? null,
+        authorImageUrl: user?.profile_image_url ?? null,
       });
       res.status(201).json(review);
     } catch (err) {
       console.error("Error adding review:", err);
       res.status(500).json({ message: "Failed to add review" });
+    }
+  });
+
+  // ─── CHALLENGES ───────────────────────────────────────────────
+  app.get("/api/challenges", async (_req, res) => {
+    try {
+      const all = await storage.getChallenges();
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch challenges" });
+    }
+  });
+
+  app.get("/api/challenges/active", async (_req, res) => {
+    try {
+      const challenge = await storage.getActiveChallenge();
+      res.json(challenge ?? null);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch active challenge" });
+    }
+  });
+
+  app.post("/api/challenges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getUserProfile(userId);
+      if (!profile?.isAdmin) return res.status(403).json({ message: "Admin only" });
+
+      const parsed = insertChallengeSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid challenge data" });
+
+      const challenge = await storage.createChallenge(parsed.data, userId);
+      res.status(201).json(challenge);
+    } catch (err) {
+      console.error("Error creating challenge:", err);
+      res.status(500).json({ message: "Failed to create challenge" });
+    }
+  });
+
+  app.patch("/api/challenges/:id/toggle", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getUserProfile(userId);
+      if (!profile?.isAdmin) return res.status(403).json({ message: "Admin only" });
+
+      const id = parseInt(req.params.id);
+      const updated = await storage.toggleChallengeActive(id);
+      if (!updated) return res.status(404).json({ message: "Challenge not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to toggle challenge" });
+    }
+  });
+
+  // ─── COMMUNITY MESSAGES ───────────────────────────────────────
+  app.get("/api/community-messages/:recipeId", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const messages = await storage.getMessagesByRecipe(recipeId);
+      res.json(messages);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/community-messages/:recipeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const recipeId = parseInt(req.params.recipeId);
+      const user = req.user.claims;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content required" });
+
+      const senderName = user.first_name
+        ? `${user.first_name} ${user.last_name ?? ""}`.trim()
+        : user.email ?? "Community Member";
+      const senderImageUrl = user.profile_image_url ?? null;
+
+      const msg = await storage.addCommunityMessage(
+        recipeId, user.sub, senderName, senderImageUrl, content.trim()
+      );
+      res.status(201).json(msg);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // ─── USER PROFILE / ADMIN ─────────────────────────────────────
+  app.get("/api/my-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getUserProfile(userId);
+      res.json(profile ?? { userId, isAdmin: false });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  app.post("/api/claim-admin", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = req.user.claims;
+      const alreadyExists = await storage.adminExists();
+      if (alreadyExists) {
+        const profile = await storage.getUserProfile(userId);
+        if (!profile?.isAdmin) {
+          return res.status(403).json({ message: "An admin already exists" });
+        }
+        return res.json(profile);
+      }
+      const displayName = user.first_name
+        ? `${user.first_name} ${user.last_name ?? ""}`.trim()
+        : user.email ?? "Admin";
+      const profile = await storage.claimAdmin(userId, displayName);
+      res.json(profile);
+    } catch (err) {
+      console.error("Error claiming admin:", err);
+      res.status(500).json({ message: "Failed to claim admin" });
     }
   });
 

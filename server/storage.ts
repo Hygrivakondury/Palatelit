@@ -1,11 +1,17 @@
-import { recipes, favorites, reviews, type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite } from "@shared/schema";
+import {
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles,
+  type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
+  type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
+} from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
 
 export interface IStorage {
   getRecipes(search?: string, cuisine?: string): Promise<Recipe[]>;
+  getUserRecipes(userId: string): Promise<Recipe[]>;
+  getCommunityRecipes(): Promise<Recipe[]>;
   getRecipe(id: number): Promise<Recipe | undefined>;
-  createRecipe(recipe: InsertRecipe): Promise<Recipe>;
+  createRecipe(recipe: Partial<InsertRecipe>): Promise<Recipe>;
   updateRecipeImage(id: number, imageUrl: string): Promise<Recipe | undefined>;
   recipeCount(): Promise<number>;
   // Favorites
@@ -15,7 +21,20 @@ export interface IStorage {
   removeFavorite(userId: string, recipeId: number): Promise<void>;
   // Reviews
   getReviewsByRecipe(recipeId: number): Promise<Review[]>;
-  addReview(review: InsertReview & { authorName?: string; authorImageUrl?: string }): Promise<Review>;
+  addReview(review: InsertReview & { authorName?: string; authorImageUrl?: string | null }): Promise<Review>;
+  // Challenges
+  getChallenges(): Promise<Challenge[]>;
+  getActiveChallenge(): Promise<Challenge | undefined>;
+  createChallenge(challenge: InsertChallenge, createdBy: string): Promise<Challenge>;
+  toggleChallengeActive(id: number): Promise<Challenge | undefined>;
+  // Community Messages
+  getMessagesByRecipe(recipeId: number): Promise<CommunityMessage[]>;
+  addCommunityMessage(recipeId: number, senderId: string, senderName: string | null, senderImageUrl: string | null, content: string): Promise<CommunityMessage>;
+  // User Profiles
+  getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
+  adminExists(): Promise<boolean>;
+  claimAdmin(userId: string, displayName?: string): Promise<UserProfile>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -53,13 +72,25 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getUserRecipes(userId: string): Promise<Recipe[]> {
+    return db.select().from(recipes)
+      .where(eq(recipes.submittedBy, userId))
+      .orderBy(desc(recipes.createdAt));
+  }
+
+  async getCommunityRecipes(): Promise<Recipe[]> {
+    return db.select().from(recipes)
+      .where(eq(recipes.isUserSubmitted, true))
+      .orderBy(desc(recipes.createdAt));
+  }
+
   async getRecipe(id: number): Promise<Recipe | undefined> {
     const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
     return recipe;
   }
 
-  async createRecipe(recipe: InsertRecipe): Promise<Recipe> {
-    const [created] = await db.insert(recipes).values(recipe).returning();
+  async createRecipe(recipe: Partial<InsertRecipe>): Promise<Recipe> {
+    const [created] = await db.insert(recipes).values(recipe as InsertRecipe).returning();
     return created;
   }
 
@@ -99,9 +130,75 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(reviews).where(eq(reviews.recipeId, recipeId)).orderBy(reviews.createdAt);
   }
 
-  async addReview(review: InsertReview & { authorName?: string; authorImageUrl?: string }): Promise<Review> {
+  async addReview(review: InsertReview & { authorName?: string; authorImageUrl?: string | null }): Promise<Review> {
     const [created] = await db.insert(reviews).values(review).returning();
     return created;
+  }
+
+  async getChallenges(): Promise<Challenge[]> {
+    return db.select().from(challenges).orderBy(desc(challenges.createdAt));
+  }
+
+  async getActiveChallenge(): Promise<Challenge | undefined> {
+    const [challenge] = await db.select().from(challenges)
+      .where(eq(challenges.isActive, true))
+      .orderBy(desc(challenges.createdAt))
+      .limit(1);
+    return challenge;
+  }
+
+  async createChallenge(challenge: InsertChallenge, createdBy: string): Promise<Challenge> {
+    const [created] = await db.insert(challenges).values({ ...challenge, createdBy }).returning();
+    return created;
+  }
+
+  async toggleChallengeActive(id: number): Promise<Challenge | undefined> {
+    const [current] = await db.select().from(challenges).where(eq(challenges.id, id));
+    if (!current) return undefined;
+    const [updated] = await db.update(challenges)
+      .set({ isActive: !current.isActive })
+      .where(eq(challenges.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getMessagesByRecipe(recipeId: number): Promise<CommunityMessage[]> {
+    return db.select().from(communityMessages)
+      .where(eq(communityMessages.recipeId, recipeId))
+      .orderBy(communityMessages.createdAt);
+  }
+
+  async addCommunityMessage(recipeId: number, senderId: string, senderName: string | null, senderImageUrl: string | null, content: string): Promise<CommunityMessage> {
+    const [msg] = await db.insert(communityMessages).values({
+      recipeId, senderId, senderName, senderImageUrl, content,
+    }).returning();
+    return msg;
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile> {
+    const [profile] = await db.insert(userProfiles)
+      .values({ userId, ...data })
+      .onConflictDoUpdate({ target: userProfiles.userId, set: data })
+      .returning();
+    return profile;
+  }
+
+  async adminExists(): Promise<boolean> {
+    const [result] = await db.select().from(userProfiles).where(eq(userProfiles.isAdmin, true)).limit(1);
+    return !!result;
+  }
+
+  async claimAdmin(userId: string, displayName?: string): Promise<UserProfile> {
+    const [profile] = await db.insert(userProfiles)
+      .values({ userId, isAdmin: true, displayName: displayName ?? null })
+      .onConflictDoUpdate({ target: userProfiles.userId, set: { isAdmin: true } })
+      .returning();
+    return profile;
   }
 }
 
