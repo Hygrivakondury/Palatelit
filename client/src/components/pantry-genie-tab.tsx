@@ -25,6 +25,7 @@ interface PantryGenieTabProps {
 export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [newItem, setNewItem] = useState("");
   const [identified, setIdentified] = useState<string[]>([]);
   const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
@@ -252,22 +253,46 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
             <Plus size={14} />
           </Button>
           <Button
-            data-testid="button-scan-photo"
+            data-testid="button-scan-gallery"
             size="sm"
             variant="outline"
             onClick={() => fileRef.current?.click()}
             disabled={analyzePhotoMutation.isPending}
             className="h-9 border-primary text-primary hover:bg-primary/5"
+            title="Choose a photo from your gallery"
+          >
+            {analyzePhotoMutation.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Image size={14} />
+            )}
+            <span className="ml-1 hidden sm:inline">Gallery</span>
+          </Button>
+          <Button
+            data-testid="button-scan-camera"
+            size="sm"
+            variant="outline"
+            onClick={() => cameraRef.current?.click()}
+            disabled={analyzePhotoMutation.isPending}
+            className="h-9 border-primary text-primary hover:bg-primary/5"
+            title="Take a photo with your camera"
           >
             {analyzePhotoMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <Camera size={14} />
             )}
-            <span className="ml-1 hidden sm:inline">Scan Photo</span>
+            <span className="ml-1 hidden sm:inline">Camera</span>
           </Button>
           <input
             ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
+          <input
+            ref={cameraRef}
             type="file"
             accept="image/*"
             capture="environment"

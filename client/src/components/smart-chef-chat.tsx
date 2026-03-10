@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChefHat, X, Send, Sparkles, RotateCcw } from "lucide-react";
+import { ChefHat, X, Send, Sparkles, RotateCcw, BookMarked, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,14 +21,24 @@ const SUGGESTED_QUESTIONS = [
   "What spices for biryani?",
 ];
 
+function looksLikeRecipe(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasIngredients = /ingredient/.test(lower);
+  const hasInstructions = /instruction|method|step|direction|preparation/.test(lower);
+  return hasIngredients && hasInstructions;
+}
+
 export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -40,6 +51,39 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
   }, [open]);
+
+  const saveRecipeMutation = useMutation({
+    mutationFn: async ({ messageText, index }: { messageText: string; index: number }) => {
+      const res = await fetch("/api/chef-chat/save-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ messageText }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to save recipe");
+      }
+      return { data: await res.json(), index };
+    },
+    onSuccess: ({ data, index }) => {
+      setSavedIndices((prev) => new Set([...prev, index]));
+      qc.invalidateQueries({ queryKey: ["/api/recipes"] });
+      toast({
+        title: data.alreadyExists ? "Already in your library" : "Recipe added!",
+        description: data.alreadyExists
+          ? `"${data.recipe.title}" is already in the recipe library.`
+          : `"${data.recipe.title}" has been added to the recipe library.`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Could not save recipe",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -122,6 +166,7 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
   const clearChat = () => {
     abortRef.current?.abort();
     setMessages([]);
+    setSavedIndices(new Set());
     setStreaming(false);
   };
 
@@ -202,7 +247,7 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
                       Ask me anything about vegetarian cooking!
                     </p>
                     <p className="text-xs text-neutral-500 mt-1">
-                      I know Indian cuisine inside out.
+                      I know Indian cuisine inside out. Ask for a recipe and I can save it to your library.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -220,28 +265,49 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
                 </div>
               ) : (
                 messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    data-testid={`message-${msg.role}-${i}`}
-                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {msg.role === "assistant" && (
-                      <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 mr-2">
-                        <ChefHat size={13} className="text-white" />
+                  <div key={i}>
+                    <div
+                      data-testid={`message-${msg.role}-${i}`}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      {msg.role === "assistant" && (
+                        <div className="w-6 h-6 rounded-full bg-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 mr-2">
+                          <ChefHat size={13} className="text-white" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                          msg.role === "user"
+                            ? "bg-emerald-600 text-white rounded-br-sm"
+                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 rounded-bl-sm"
+                        }`}
+                      >
+                        {msg.content}
+                        {msg.role === "assistant" && i === messages.length - 1 && streaming && (
+                          <span className="inline-block w-1.5 h-3.5 bg-emerald-600 ml-0.5 rounded-sm animate-pulse align-middle" />
+                        )}
+                      </div>
+                    </div>
+                    {msg.role === "assistant" && !streaming && looksLikeRecipe(msg.content) && (
+                      <div className="ml-8 mt-1.5">
+                        {savedIndices.has(i) ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                            <CheckCircle2 size={13} />
+                            Saved to library
+                          </span>
+                        ) : (
+                          <button
+                            data-testid={`button-save-recipe-${i}`}
+                            onClick={() => saveRecipeMutation.mutate({ messageText: msg.content, index: i })}
+                            disabled={saveRecipeMutation.isPending}
+                            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors disabled:opacity-60"
+                          >
+                            <BookMarked size={11} />
+                            Save to Recipe Library
+                          </button>
+                        )}
                       </div>
                     )}
-                    <div
-                      className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                        msg.role === "user"
-                          ? "bg-emerald-600 text-white rounded-br-sm"
-                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 rounded-bl-sm"
-                      }`}
-                    >
-                      {msg.content}
-                      {msg.role === "assistant" && i === messages.length - 1 && streaming && (
-                        <span className="inline-block w-1.5 h-3.5 bg-emerald-600 ml-0.5 rounded-sm animate-pulse align-middle" />
-                      )}
-                    </div>
                   </div>
                 ))
               )}
@@ -255,7 +321,7 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about ingredients, substitutions, spices…"
+                  placeholder="Ask about ingredients, substitutions, spices… or request a recipe!"
                   className="resize-none text-sm min-h-[40px] max-h-[100px] flex-1 rounded-xl border-neutral-200 dark:border-neutral-700 focus:ring-emerald-500"
                   rows={1}
                   disabled={streaming}

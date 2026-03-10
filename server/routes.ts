@@ -388,18 +388,19 @@ export async function registerRoutes(
       const mimeType = req.file.mimetype as string;
 
       const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: [
           {
+            role: "user",
             parts: [
               {
                 inlineData: { mimeType, data: imageData },
               },
               {
                 text: `You are a vegetable and ingredient identification expert.
-Look at this image and identify ALL vegetables, fruits, legumes, grains, and cooking ingredients visible.
+Look at this image carefully and identify ALL vegetables, fruits, legumes, grains, dairy products, and cooking ingredients visible.
 Return ONLY a valid JSON array of ingredient names in English, lowercase, singular form.
-Example: ["spinach", "potato", "tomato", "onion", "garlic"]
+Example: ["spinach", "potato", "tomato", "onion", "garlic", "paneer", "lentil"]
 Do NOT include non-food items, cooking utensils, or packaging text.
 Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
               },
@@ -408,12 +409,13 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
         ],
       });
 
-      fs.unlinkSync(req.file.path);
+      if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
-      const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+      const rawText = response.text ?? response.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+      console.log("[Pantry] Gemini raw response:", rawText?.slice(0, 200));
       let ingredients: string[] = [];
       try {
-        const cleaned = text.replace(/```json|```/g, "").trim();
+        const cleaned = rawText.replace(/```json|```/g, "").trim();
         ingredients = JSON.parse(cleaned);
         if (!Array.isArray(ingredients)) ingredients = [];
       } catch {
@@ -638,6 +640,82 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
   });
 
   // ─── SMART CHEF AI ────────────────────────────────────────────
+  app.post("/api/chef-chat/save-recipe", isAuthenticated, async (req: any, res) => {
+    try {
+      const { messageText } = req.body;
+      if (!messageText) return res.status(400).json({ message: "messageText required" });
+
+      const extraction = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Extract the recipe from the following cooking assistant message and return it as a single JSON object with these exact fields:
+- title: string (the recipe name, e.g. "Palak Paneer")
+- description: string (1-2 sentence description of the dish)
+- ingredients: string[] (each as "quantity ingredient", e.g. ["200g paneer", "2 cups spinach"])
+- instructions: string[] (each step as a complete sentence, no numbering)
+- prepTime: number (prep time in minutes, integer)
+- cookTime: number (cook time in minutes, integer)
+- servings: number (number of servings, integer, default 4)
+- cuisineType: string (one of: North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Pan-Indian, Fusion)
+- dietaryTags: string[] (subset of exactly these values: ["Vegan", "Gluten-Free", "Jain Friendly"])
+
+Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
+          },
+          { role: "user", content: messageText },
+        ],
+        max_tokens: 1200,
+        temperature: 0.2,
+      });
+
+      const rawJson = extraction.choices[0]?.message?.content ?? "{}";
+      let recipeData: any;
+      try {
+        const cleaned = rawJson.replace(/```json|```/g, "").trim();
+        recipeData = JSON.parse(cleaned);
+      } catch {
+        return res.status(422).json({ message: "Could not parse recipe from message" });
+      }
+
+      if (!recipeData.title || !Array.isArray(recipeData.ingredients) || !Array.isArray(recipeData.instructions)) {
+        return res.status(422).json({ message: "Incomplete recipe data extracted" });
+      }
+
+      const allRecipes = await storage.getRecipes();
+      const existing = allRecipes.find(
+        (r) => r.title.toLowerCase().trim() === recipeData.title.toLowerCase().trim()
+      );
+      if (existing) return res.json({ recipe: existing, alreadyExists: true });
+
+      const slug = recipeData.title.toLowerCase().replace(/[^a-z0-9]+/g, "+");
+      const youtubeUrl = `https://www.youtube.com/results?search_query=${slug}+recipe+indian+vegetarian`;
+
+      const newRecipe = await storage.createRecipe({
+        title: recipeData.title,
+        description: recipeData.description || "",
+        ingredients: recipeData.ingredients,
+        instructions: recipeData.instructions,
+        prepTime: Number(recipeData.prepTime) || 15,
+        cookTime: Number(recipeData.cookTime) || 20,
+        servings: Number(recipeData.servings) || 4,
+        cuisineType: recipeData.cuisineType || "Pan-Indian",
+        dietaryTags: Array.isArray(recipeData.dietaryTags) ? recipeData.dietaryTags : [],
+        youtubeUrl,
+        isUserSubmitted: false,
+        authorId: req.user.claims.sub,
+        submittedBy: req.user.claims.email,
+        submittedByName:
+          `${req.user.claims.first_name || ""} ${req.user.claims.last_name || ""}`.trim() || "Smart Chef AI",
+      });
+
+      res.json({ recipe: newRecipe, alreadyExists: false });
+    } catch (err) {
+      console.error("Save recipe from chat error:", err);
+      res.status(500).json({ message: "Failed to save recipe" });
+    }
+  });
+
   app.post("/api/chef-chat", isAuthenticated, async (req, res) => {
     try {
       const { messages: userMessages, recipeContext } = req.body;
