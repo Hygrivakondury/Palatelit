@@ -2533,20 +2533,43 @@ const seedData = [
   },
 ];
 
+function recipeSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function recipeImageUrl(title: string): string {
+  return `/stock-images/recipe-${recipeSlug(title)}.png`;
+}
+
 export async function seedRecipes() {
   try {
     const allExisting = await storage.getRecipes();
+
+    // ── PATCH: fix any recipes that have null imageUrl ────────────────
+    const missing = allExisting.filter((r) => !r.imageUrl);
+    if (missing.length > 0) {
+      console.log(`[seed] Patching ${missing.length} recipe(s) with missing imageUrl...`);
+      for (const r of missing) {
+        await storage.updateRecipeImage(r.id, recipeImageUrl(r.title));
+      }
+      console.log(`[seed] Image URLs patched.`);
+    }
+
+    // ── SEED: insert any missing recipes ─────────────────────────────
     const existingTitles = new Set(allExisting.map((r) => r.title));
     const toSeed = seedData.filter((r) => !existingTitles.has(r.title));
 
     if (toSeed.length === 0) {
-      console.log(`[seed] All ${allExisting.length} recipes already present. Skipping.`);
+      console.log(`[seed] All ${allExisting.length} recipes already present.`);
       return;
     }
 
     console.log(`[seed] Adding ${toSeed.length} new recipes (${allExisting.length} already exist)...`);
     for (const recipe of toSeed) {
-      await storage.createRecipe(recipe as any);
+      await storage.createRecipe({
+        ...recipe,
+        imageUrl: recipeImageUrl(recipe.title),
+      } as any);
     }
     console.log(`[seed] Successfully added ${toSeed.length} recipes. Total now: ${allExisting.length + toSeed.length}`);
   } catch (err) {
