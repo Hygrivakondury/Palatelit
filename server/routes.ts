@@ -1,9 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { insertRecipeSchema } from "@shared/schema";
+import { insertRecipeSchema, insertReviewSchema } from "@shared/schema";
 import { seedRecipes } from "./seed";
+
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const upload = multer({
+  dest: uploadDir,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -12,10 +27,16 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // Serve uploaded images
+  app.use("/uploads", (req, res, next) => {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    next();
+  }, (await import("express")).default.static(uploadDir));
+
   // Seed on startup
   await seedRecipes();
 
-  // GET /api/recipes - list recipes with optional search + cuisine filter
+  // ─── RECIPES ──────────────────────────────────────────────────
   app.get("/api/recipes", async (req, res) => {
     try {
       const search = req.query.search as string | undefined;
@@ -28,7 +49,6 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/recipes/:id - single recipe
   app.get("/api/recipes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -42,19 +62,120 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/recipes - create recipe (auth required)
   app.post("/api/recipes", isAuthenticated, async (req: any, res) => {
     try {
       const parsed = insertRecipeSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
-      const recipe = await storage.createRecipe({
-        ...parsed.data,
-        authorId: req.user.claims.sub,
-      });
+      const recipe = await storage.createRecipe({ ...parsed.data, authorId: req.user.claims.sub });
       res.status(201).json(recipe);
     } catch (err) {
       console.error("Error creating recipe:", err);
       res.status(500).json({ message: "Failed to create recipe" });
+    }
+  });
+
+  // ─── IMAGE UPLOAD ─────────────────────────────────────────────
+  app.post("/api/recipes/:id/upload-image", isAuthenticated, upload.single("image"), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid recipe ID" });
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+
+      // Rename to use original extension
+      const ext = path.extname(req.file.originalname) || ".jpg";
+      const newName = `recipe-${id}-${Date.now()}${ext}`;
+      const newPath = path.join(uploadDir, newName);
+      fs.renameSync(req.file.path, newPath);
+
+      const imageUrl = `/uploads/${newName}`;
+      const updated = await storage.updateRecipeImage(id, imageUrl);
+      if (!updated) return res.status(404).json({ message: "Recipe not found" });
+      res.json({ imageUrl, recipe: updated });
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      res.status(500).json({ message: "Failed to upload image" });
+    }
+  });
+
+  // ─── FAVORITES ────────────────────────────────────────────────
+  app.get("/api/favorites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const favs = await storage.getFavoritesByUser(userId);
+      res.json(favs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch favorites" });
+    }
+  });
+
+  app.get("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const recipeId = parseInt(req.params.id);
+      const isFav = await storage.isFavorited(userId, recipeId);
+      res.json({ favorited: isFav });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to check favorite" });
+    }
+  });
+
+  app.post("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const recipeId = parseInt(req.params.id);
+      const fav = await storage.addFavorite(userId, recipeId);
+      res.status(201).json(fav);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to add favorite" });
+    }
+  });
+
+  app.delete("/api/recipes/:id/favorite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const recipeId = parseInt(req.params.id);
+      await storage.removeFavorite(userId, recipeId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to remove favorite" });
+    }
+  });
+
+  // ─── REVIEWS ──────────────────────────────────────────────────
+  app.get("/api/recipes/:id/reviews", async (req, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      if (isNaN(recipeId)) return res.status(400).json({ message: "Invalid recipe ID" });
+      const recipeReviews = await storage.getReviewsByRecipe(recipeId);
+      res.json(recipeReviews);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.post("/api/recipes/:id/reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const recipeId = parseInt(req.params.id);
+      if (isNaN(recipeId)) return res.status(400).json({ message: "Invalid recipe ID" });
+      const parsed = insertReviewSchema.safeParse({ ...req.body, recipeId, userId: req.user.claims.sub });
+      if (!parsed.success) return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+
+      // Fetch author info
+      const { authStorage } = await import("./replit_integrations/auth");
+      const user = await authStorage.getUser(req.user.claims.sub);
+      const authorName = user?.firstName
+        ? `${user.firstName} ${user.lastName ?? ""}`.trim()
+        : user?.email ?? "Anonymous";
+
+      const review = await storage.addReview({
+        ...parsed.data,
+        authorName,
+        authorImageUrl: user?.profileImageUrl ?? null,
+      });
+      res.status(201).json(review);
+    } catch (err) {
+      console.error("Error adding review:", err);
+      res.status(500).json({ message: "Failed to add review" });
     }
   });
 

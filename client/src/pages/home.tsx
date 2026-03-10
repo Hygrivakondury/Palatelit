@@ -1,24 +1,28 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import RecipeCard from "@/components/recipe-card";
 import RecipeDetailModal from "@/components/recipe-detail-modal";
-import { Search, Leaf, ChefHat, X, LogOut, User, Sparkles, SlidersHorizontal } from "lucide-react";
-import type { Recipe } from "@shared/schema";
+import { Search, Leaf, ChefHat, X, LogOut, User, Sparkles, SlidersHorizontal, Heart } from "lucide-react";
+import type { Recipe, Favorite } from "@shared/schema";
 import { CUISINE_TYPES } from "@shared/schema";
 
+const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
+
 export default function HomePage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string>("All");
+  const [selectedDietary, setSelectedDietary] = useState<string>("All");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const { data: recipes = [], isLoading: recipesLoading } = useQuery<Recipe[]>({
     queryKey: ["/api/recipes", { search: activeSearch, cuisine: selectedCuisine === "All" ? "" : selectedCuisine }],
@@ -32,25 +36,34 @@ export default function HomePage() {
     },
   });
 
-  const handleSearch = () => {
-    setActiveSearch(searchQuery);
-  };
+  const { data: userFavorites = [] } = useQuery<Favorite[]>({
+    queryKey: ["/api/favorites"],
+    queryFn: async () => {
+      const res = await fetch("/api/favorites", { credentials: "include" });
+      return res.json();
+    },
+    enabled: isAuthenticated,
+  });
 
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setActiveSearch("");
-  };
+  const favoritedRecipeIds = new Set(userFavorites.map((f) => f.recipeId));
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSearch();
-  };
+  const filteredRecipes = recipes.filter((r) => {
+    if (showFavoritesOnly && !favoritedRecipeIds.has(r.id)) return false;
+    if (selectedDietary !== "All" && !r.dietaryTags?.includes(selectedDietary as any)) return false;
+    return true;
+  });
+
+  const handleSearch = () => setActiveSearch(searchQuery);
+  const handleClearSearch = () => { setSearchQuery(""); setActiveSearch(""); };
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter") handleSearch(); };
 
   const cuisineOptions = ["All", ...CUISINE_TYPES];
-  const isFiltering = activeSearch || selectedCuisine !== "All";
 
   const userInitials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.trim() || user.email?.[0]?.toUpperCase() || "U"
     : "U";
+
+  const isFiltering = activeSearch || selectedCuisine !== "All" || selectedDietary !== "All" || showFavoritesOnly;
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,11 +100,7 @@ export default function HomePage() {
                 </button>
               )}
             </div>
-            <Button
-              onClick={handleSearch}
-              className="h-10 px-5 gap-1.5"
-              data-testid="button-search"
-            >
+            <Button onClick={handleSearch} className="h-10 px-5 gap-1.5" data-testid="button-search">
               <Search className="w-3.5 h-3.5" />
               <span className="hidden sm:block">Search</span>
             </Button>
@@ -119,8 +128,17 @@ export default function HomePage() {
                   </p>
                   {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
                 </div>
-                <DropdownMenuItem className="gap-2 cursor-pointer" data-testid="menu-item-profile">
-                  <User className="w-4 h-4" /> Profile
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => setShowFavoritesOnly((v) => !v)}
+                  data-testid="menu-item-favorites"
+                >
+                  <Heart className="w-4 h-4" /> My Favourites
+                  {favoritedRecipeIds.size > 0 && (
+                    <span className="ml-auto text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                      {favoritedRecipeIds.size}
+                    </span>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <a href="/api/logout" className="gap-2 cursor-pointer text-destructive focus:text-destructive" data-testid="menu-item-logout">
@@ -137,38 +155,80 @@ export default function HomePage() {
         {/* Page Header */}
         <div className="mb-8 space-y-2">
           <h1 className="font-serif text-3xl font-bold text-foreground">
-            {activeSearch
-              ? `Recipes matching "${activeSearch}"`
-              : "Discover Recipes"}
+            {showFavoritesOnly ? "My Favourites" : activeSearch ? `Results for "${activeSearch}"` : "Discover Recipes"}
           </h1>
           <p className="text-muted-foreground">
-            {activeSearch
-              ? `${recipes.length} recipe${recipes.length !== 1 ? "s" : ""} found`
-              : "Explore India's finest vegetarian cooking"}
+            {filteredRecipes.length} recipe{filteredRecipes.length !== 1 ? "s" : ""}
+            {showFavoritesOnly ? " saved" : activeSearch ? " found" : " — Explore India's finest vegetarian cooking"}
           </p>
         </div>
 
-        {/* Cuisine Filter Pills */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Filter by Cuisine</span>
+        {/* Filter rows */}
+        <div className="space-y-4 mb-8">
+          {/* Cuisine filter */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cuisine</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {cuisineOptions.map((cuisine) => (
+                <button
+                  key={cuisine}
+                  onClick={() => setSelectedCuisine(cuisine)}
+                  data-testid={`filter-cuisine-${cuisine.toLowerCase().replace(/\s+/g, "-")}`}
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                    selectedCuisine === cuisine
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-foreground border-card-border hover:border-primary/40 hover:bg-primary/5"
+                  }`}
+                >
+                  {cuisine}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {cuisineOptions.map((cuisine) => (
+
+          {/* Dietary + Favorites filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 mr-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dietary</span>
+            </div>
+            {DIETARY_FILTER_OPTIONS.map((tag) => (
               <button
-                key={cuisine}
-                onClick={() => setSelectedCuisine(cuisine)}
-                data-testid={`filter-cuisine-${cuisine.toLowerCase().replace(/\s+/g, "-")}`}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                  selectedCuisine === cuisine
+                key={tag}
+                onClick={() => setSelectedDietary(tag)}
+                data-testid={`filter-dietary-${tag.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                  selectedDietary === tag
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card text-foreground border-card-border hover:border-primary/40 hover:bg-primary/5"
                 }`}
               >
-                {cuisine}
+                {tag === "Vegan" && "🌱 "}{tag === "Gluten-Free" && "🌾 "}{tag === "Jain Friendly" && "🙏 "}
+                {tag}
               </button>
             ))}
+
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowFavoritesOnly((v) => !v)}
+                data-testid="filter-favorites"
+                className={`ml-2 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all flex items-center gap-1.5 ${
+                  showFavoritesOnly
+                    ? "bg-red-500 text-white border-red-500"
+                    : "bg-card text-foreground border-card-border hover:border-red-300 hover:bg-red-50"
+                }`}
+              >
+                <Heart className={`w-3.5 h-3.5 ${showFavoritesOnly ? "fill-white" : ""}`} />
+                Favourites
+                {favoritedRecipeIds.size > 0 && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${showFavoritesOnly ? "bg-white/20" : "bg-primary/10 text-primary"}`}>
+                    {favoritedRecipeIds.size}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -176,13 +236,14 @@ export default function HomePage() {
         {isFiltering && (
           <div className="mb-6 flex items-center gap-3 p-3 bg-accent/50 border border-accent-border rounded-xl">
             <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
-            <p className="text-sm text-accent-foreground flex-1">
-              {activeSearch && <><span className="font-semibold">Genie Filter:</span> Looking for recipes with "{activeSearch}"</>}
-              {activeSearch && selectedCuisine !== "All" && " · "}
-              {selectedCuisine !== "All" && <><span className="font-semibold">Cuisine:</span> {selectedCuisine}</>}
+            <p className="text-sm text-accent-foreground flex-1 truncate">
+              {activeSearch && <><span className="font-semibold">Ingredients:</span> "{activeSearch}" · </>}
+              {selectedCuisine !== "All" && <><span className="font-semibold">Cuisine:</span> {selectedCuisine} · </>}
+              {selectedDietary !== "All" && <><span className="font-semibold">Dietary:</span> {selectedDietary} · </>}
+              {showFavoritesOnly && <span className="font-semibold">❤️ Favourites only</span>}
             </p>
             <button
-              onClick={() => { handleClearSearch(); setSelectedCuisine("All"); }}
+              onClick={() => { handleClearSearch(); setSelectedCuisine("All"); setSelectedDietary("All"); setShowFavoritesOnly(false); }}
               className="text-xs text-accent-foreground underline hover:no-underline flex-shrink-0"
               data-testid="button-clear-all-filters"
             >
@@ -196,38 +257,50 @@ export default function HomePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="bg-card border border-card-border rounded-2xl overflow-hidden">
-                <Skeleton className="w-full h-48" />
+                <Skeleton className="w-full h-44" />
                 <div className="p-4 space-y-3">
                   <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-2/3" />
+                  <div className="flex gap-1.5 mt-2">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : recipes.length === 0 ? (
+        ) : filteredRecipes.length === 0 ? (
           <div className="text-center py-24 space-y-4">
             <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mx-auto">
-              <ChefHat className="w-10 h-10 text-muted-foreground" />
+              {showFavoritesOnly ? <Heart className="w-10 h-10 text-muted-foreground" /> : <ChefHat className="w-10 h-10 text-muted-foreground" />}
             </div>
-            <h3 className="font-serif text-2xl font-bold text-foreground">No Recipes Found</h3>
+            <h3 className="font-serif text-2xl font-bold text-foreground">
+              {showFavoritesOnly ? "No Favourites Yet" : "No Recipes Found"}
+            </h3>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              {activeSearch
-                ? `We couldn't find recipes with "${activeSearch}". Try different ingredients or fewer items.`
-                : "No recipes match your filters. Try selecting a different cuisine."}
+              {showFavoritesOnly
+                ? "Save recipes you love by clicking the heart icon in any recipe."
+                : activeSearch
+                ? `We couldn't find recipes with "${activeSearch}". Try different ingredients.`
+                : "No recipes match your filters. Try adjusting them."}
             </p>
-            <Button variant="outline" onClick={() => { handleClearSearch(); setSelectedCuisine("All"); }} data-testid="button-clear-filters-empty">
+            <Button
+              variant="outline"
+              onClick={() => { handleClearSearch(); setSelectedCuisine("All"); setSelectedDietary("All"); setShowFavoritesOnly(false); }}
+              data-testid="button-clear-filters-empty"
+            >
               Clear Filters
             </Button>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {recipes.map((recipe) => (
+            {filteredRecipes.map((recipe) => (
               <RecipeCard
                 key={recipe.id}
                 recipe={recipe}
                 onClick={() => setSelectedRecipe(recipe)}
+                isFavorited={favoritedRecipeIds.has(recipe.id)}
               />
             ))}
           </div>
@@ -239,6 +312,10 @@ export default function HomePage() {
         <RecipeDetailModal
           recipe={selectedRecipe}
           onClose={() => setSelectedRecipe(null)}
+          onRecipeUpdated={(updated) => {
+            setSelectedRecipe(updated);
+            queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+          }}
         />
       )}
     </div>

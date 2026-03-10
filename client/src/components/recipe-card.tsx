@@ -1,24 +1,25 @@
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, ChefHat } from "lucide-react";
+import { Clock, Users, ChefHat, Heart } from "lucide-react";
 import type { Recipe } from "@shared/schema";
 
 interface RecipeCardProps {
   recipe: Recipe;
   onClick: () => void;
+  isFavorited?: boolean;
 }
 
 const cuisineColors: Record<string, string> = {
-  "North Indian": "bg-red-50 text-red-700 border-red-100 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900",
-  "South Indian": "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900",
-  "Gujarati": "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900",
-  "Punjabi": "bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900",
-  "Bengali": "bg-sky-50 text-sky-700 border-sky-100 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900",
-  "Rajasthani": "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900",
-  "Maharashtrian": "bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900",
-  "Fusion": "bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-900",
-  "Pan-Indian": "bg-teal-50 text-teal-700 border-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900",
-  "East Indian": "bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900",
-  "West Indian": "bg-lime-50 text-lime-700 border-lime-100 dark:bg-lime-950/30 dark:text-lime-400 dark:border-lime-900",
+  "North Indian": "bg-red-50 text-red-700 border-red-100 dark:bg-red-950/30 dark:text-red-400",
+  "South Indian": "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400",
+  "Gujarati": "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400",
+  "Punjabi": "bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-950/30 dark:text-orange-400",
+  "Bengali": "bg-sky-50 text-sky-700 border-sky-100 dark:bg-sky-950/30 dark:text-sky-400",
+  "Rajasthani": "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-950/30 dark:text-yellow-400",
+  "Maharashtrian": "bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-950/30 dark:text-purple-400",
+  "Fusion": "bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/30 dark:text-pink-400",
+  "Pan-Indian": "bg-teal-50 text-teal-700 border-teal-100 dark:bg-teal-950/30 dark:text-teal-400",
+  "East Indian": "bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-400",
+  "West Indian": "bg-lime-50 text-lime-700 border-lime-100 dark:bg-lime-950/30 dark:text-lime-400",
 };
 
 const cuisineEmojis: Record<string, string> = {
@@ -35,7 +36,13 @@ const cuisineEmojis: Record<string, string> = {
   "West Indian": "🫚",
 };
 
-export default function RecipeCard({ recipe, onClick }: RecipeCardProps) {
+const dietaryTagStyles: Record<string, string> = {
+  "Vegan": "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400",
+  "Gluten-Free": "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400",
+  "Jain Friendly": "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400",
+};
+
+export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardProps) {
   const totalTime = recipe.prepTime + recipe.cookTime;
   const badgeClass = cuisineColors[recipe.cuisineType] ?? "bg-muted text-muted-foreground border-border";
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
@@ -64,6 +71,11 @@ export default function RecipeCard({ recipe, onClick }: RecipeCardProps) {
             {recipe.cuisineType}
           </span>
         </div>
+        {isFavorited && (
+          <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 dark:bg-black/70 flex items-center justify-center shadow-sm">
+            <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -71,9 +83,27 @@ export default function RecipeCard({ recipe, onClick }: RecipeCardProps) {
         <h3 className="font-serif text-base font-bold text-card-foreground leading-snug mb-1.5 line-clamp-2 group-hover:text-primary transition-colors">
           {recipe.title}
         </h3>
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-4 leading-relaxed flex-1">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed flex-1">
           {recipe.description}
         </p>
+
+        {/* Dietary Tags */}
+        {recipe.dietaryTags && recipe.dietaryTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {recipe.dietaryTags.map((tag) => (
+              <span
+                key={tag}
+                data-testid={`tag-dietary-${recipe.id}-${tag.toLowerCase().replace(/\s+/g, "-")}`}
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${dietaryTagStyles[tag] ?? "bg-muted text-muted-foreground border-border"}`}
+              >
+                {tag === "Vegan" && "🌱 "}
+                {tag === "Gluten-Free" && "🌾 "}
+                {tag === "Jain Friendly" && "🙏 "}
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
           <div className="flex items-center gap-1.5">
@@ -86,7 +116,7 @@ export default function RecipeCard({ recipe, onClick }: RecipeCardProps) {
           </div>
           <div className="flex items-center gap-1.5">
             <ChefHat className="w-3.5 h-3.5 text-primary" />
-            <span>{recipe.ingredients.length} ingredients</span>
+            <span>{recipe.ingredients.length} items</span>
           </div>
         </div>
       </div>
