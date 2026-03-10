@@ -2545,8 +2545,9 @@ export async function seedRecipes() {
   try {
     const allExisting = await storage.getRecipes();
 
-    // ── PATCH: fix any recipes that have null imageUrl ────────────────
-    const missing = allExisting.filter((r) => !r.imageUrl);
+    // ── PATCH: fix seeded recipes that have null imageUrl ────────────
+    // (skip user-submitted recipes — those get AI-generated images separately)
+    const missing = allExisting.filter((r) => !r.imageUrl && !r.isUserSubmitted);
     if (missing.length > 0) {
       console.log(`[seed] Patching ${missing.length} recipe(s) with missing imageUrl...`);
       for (const r of missing) {

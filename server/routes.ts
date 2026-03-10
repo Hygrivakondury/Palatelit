@@ -62,6 +62,51 @@ const upload = multer({
   },
 });
 
+// ─── AUTO IMAGE GENERATION HELPERS ────────────────────────────────────────
+
+async function generateAndSaveRecipeImage(id: number, title: string): Promise<void> {
+  try {
+    const prompt = `A high-quality, realistic food photography photo of ${title}, an Indian vegetarian dish. 
+Beautifully plated on a traditional ceramic or copper serving dish, styled with garnishes like fresh coriander, 
+lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
+Shot from slightly above, clean background. Photorealistic, appetising.`;
+
+    const imageResponse = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1024x1024",
+    });
+
+    const b64 = imageResponse.data[0]?.b64_json;
+    if (!b64) throw new Error("No image data returned");
+
+    const filename = `recipe_${id}_${Date.now()}.png`;
+    const filepath = path.join(uploadDir, filename);
+    fs.writeFileSync(filepath, Buffer.from(b64, "base64"));
+    await storage.updateRecipeImage(id, `/uploads/${filename}`);
+    console.log(`[image] Auto-generated image for recipe ${id} (${title})`);
+  } catch (err) {
+    console.error(`[image] Failed to auto-generate image for recipe ${id}:`, err);
+  }
+}
+
+async function migrateUserRecipeImages(): Promise<void> {
+  try {
+    const allRecipes = await storage.getRecipes();
+    // Find user-submitted recipes with null or broken stock-image URLs
+    const needsImage = allRecipes.filter(
+      (r) => r.isUserSubmitted && (!r.imageUrl || r.imageUrl.startsWith("/stock-images/"))
+    );
+    if (needsImage.length === 0) return;
+    console.log(`[image] Generating AI images for ${needsImage.length} user-submitted recipe(s) in background...`);
+    for (const recipe of needsImage) {
+      await generateAndSaveRecipeImage(recipe.id, recipe.title);
+    }
+  } catch (err) {
+    console.error("[image] Migration error:", err);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -147,6 +192,9 @@ export async function registerRoutes(
 
       const recipe = await storage.createRecipe(body);
       res.status(201).json(recipe);
+
+      // Background: generate an AI photo for the new community recipe
+      generateAndSaveRecipeImage(recipe.id, recipe.title);
 
       const source = req.body.challengeId ? "challenge" : "community";
       const recipientEmail = user.email;
@@ -723,6 +771,9 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
 
       res.json({ recipe: newRecipe, alreadyExists: false });
 
+      // Background: generate an AI photo for the chatbot-saved recipe
+      generateAndSaveRecipeImage(newRecipe.id, newRecipe.title);
+
       const recipientEmail = req.user.claims.email;
       if (recipientEmail) {
         sendContributionEmail(recipientEmail, submittedByName, newRecipe.title, "chatbot").catch(() => {});
@@ -796,6 +847,9 @@ Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet 
       }
     }
   });
+
+  // Background: fix any existing user-submitted recipes with missing/broken images
+  migrateUserRecipeImages();
 
   return httpServer;
 }
