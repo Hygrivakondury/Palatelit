@@ -3,10 +3,16 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import multer from "multer";
+import OpenAI from "openai";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { insertRecipeSchema, insertReviewSchema } from "@shared/schema";
 import { seedRecipes } from "./seed";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -176,6 +182,71 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Error adding review:", err);
       res.status(500).json({ message: "Failed to add review" });
+    }
+  });
+
+  // ─── SMART CHEF AI ────────────────────────────────────────────
+  app.post("/api/chef-chat", isAuthenticated, async (req, res) => {
+    try {
+      const { messages: userMessages, recipeContext } = req.body;
+
+      if (!Array.isArray(userMessages) || userMessages.length === 0) {
+        return res.status(400).json({ message: "Messages are required" });
+      }
+
+      const systemPrompt = `You are Smart Chef, a knowledgeable and friendly vegetarian cooking assistant for Flavour Genie — an Indian vegetarian recipe discovery app.
+
+Your expertise:
+- Indian vegetarian and vegan cuisine (North Indian, South Indian, Gujarati, Maharashtrian, Rajasthani, Bengali, etc.)
+- Ingredient substitutions that keep dishes vegetarian or vegan
+- Spice blends, cooking techniques, and regional flavor profiles
+- Dietary adaptations: Jain (no root vegetables), gluten-free, low-oil, etc.
+- Seasonal ingredients and traditional methods
+
+STRICT RULES:
+- ONLY suggest vegetarian or vegan alternatives — NEVER recommend meat, fish, or eggs as ingredients
+- If asked about non-vegetarian options, politely explain you specialize in vegetarian cooking only
+- Keep all advice suitable for the Indian vegetarian community
+- Be warm, encouraging, and practical
+
+${recipeContext ? `Current recipe context: ${recipeContext}` : ""}
+
+Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet points for ingredient lists or steps.`;
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...userMessages.map((m: { role: string; content: string }) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
+        ],
+        stream: true,
+        max_tokens: 600,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Smart Chef AI error:", err);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "AI request failed" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ message: "Failed to get AI response" });
+      }
     }
   });
 

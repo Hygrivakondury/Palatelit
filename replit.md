@@ -21,6 +21,7 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Reviews & Ratings**: Logged-in users can post star-rated reviews; displayed in recipe detail
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
+- **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
 - **Green & Gold theme**: Professional, elegant design using Open Sans + Lora fonts
 
 ## Project Structure

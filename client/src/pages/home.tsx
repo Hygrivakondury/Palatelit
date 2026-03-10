@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import RecipeCard from "@/components/recipe-card";
 import RecipeDetailModal from "@/components/recipe-detail-modal";
+import { SmartChefChat } from "@/components/smart-chef-chat";
 import { Search, Leaf, ChefHat, X, LogOut, User, Sparkles, SlidersHorizontal, Heart } from "lucide-react";
 import type { Recipe, Favorite } from "@shared/schema";
 import { CUISINE_TYPES } from "@shared/schema";
@@ -318,6 +319,10 @@ export default function HomePage() {
           }}
         />
       )}
+
+      <SmartChefChat
+        recipeContext={selectedRecipe ? selectedRecipe.title : null}
+      />
     </div>
   );
 }

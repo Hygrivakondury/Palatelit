@@ -4,6 +4,7 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 export * from "./models/auth";
+export * from "./models/chat";
 
 export const recipes = pgTable("recipes", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
