@@ -19,6 +19,9 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Cuisine Filter**: Browse by 11 cuisine types (North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Fusion, Pan-Indian, East Indian, West Indian)
 - **Favourites**: Logged-in users can heart/save recipes; favourites accessible via filter
 - **Reviews & Ratings**: Logged-in users can post star-rated reviews; displayed in recipe detail
+- **85-Recipe Library**: 85 authentic Indian vegetarian recipes seeded across 8+ regional cuisines (North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Pan-Indian) with complete ingredients, step-by-step instructions, prep/cook times, servings, and dietary tags
+- **Dish Photos**: Every recipe has a matching stock food photograph (stored in `attached_assets/stock_images/`, served at `/stock-images/`); AI-generated photos also supported via `gpt-image-1` which now persists images to `/uploads/` and updates DB
+- **YouTube Links**: Every recipe has a `youtubeUrl` field linking to the YouTube search results for that recipe; shown as a red "Watch recipe video on YouTube" button in the recipe detail modal
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware

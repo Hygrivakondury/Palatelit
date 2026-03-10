@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Clock, Users, ChefHat, CheckCircle2, Flame, Heart, Star,
-  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X
+  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube
 } from "lucide-react";
 import type { Recipe, Review } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -261,6 +261,20 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed">{recipe.description}</p>
             </DialogHeader>
+
+            {/* YouTube link */}
+            {recipe.youtubeUrl && (
+              <a
+                href={recipe.youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="link-youtube-recipe"
+                className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm font-medium transition-colors"
+              >
+                <Youtube className="w-4 h-4 flex-shrink-0" />
+                <span>Watch recipe video on YouTube</span>
+              </a>
+            )}
 
             {/* Stats + Servings Scaler */}
             <div className="grid grid-cols-4 gap-3">

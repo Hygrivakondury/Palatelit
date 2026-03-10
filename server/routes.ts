@@ -74,6 +74,14 @@ export async function registerRoutes(
     next();
   }, (await import("express")).default.static(uploadDir));
 
+  // Serve stock images
+  const stockImgDir = path.join(process.cwd(), "attached_assets", "stock_images");
+  if (!fs.existsSync(stockImgDir)) fs.mkdirSync(stockImgDir, { recursive: true });
+  app.use("/stock-images", (req, res, next) => {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    next();
+  }, (await import("express")).default.static(stockImgDir));
+
   // Seed on startup
   await seedRecipes();
 
@@ -616,7 +624,13 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       const b64 = imageResponse.data[0]?.b64_json;
       if (!b64) return res.status(500).json({ message: "No image returned" });
 
-      res.json({ b64_json: b64, mimeType: "image/png" });
+      const filename = `recipe_${id}_${Date.now()}.png`;
+      const filepath = path.join(uploadDir, filename);
+      fs.writeFileSync(filepath, Buffer.from(b64, "base64"));
+      const imageUrl = `/uploads/${filename}`;
+      await storage.updateRecipeImage(id, imageUrl);
+
+      res.json({ imageUrl, b64_json: b64, mimeType: "image/png" });
     } catch (err) {
       console.error("Image generation error:", err);
       res.status(500).json({ message: "Failed to generate image" });

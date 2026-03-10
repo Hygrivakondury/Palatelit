@@ -18,6 +18,7 @@ export const recipes = pgTable("recipes", {
   cuisineType: varchar("cuisine_type", { length: 50 }).notNull(),
   dietaryTags: text("dietary_tags").array().notNull().default([]),
   imageUrl: text("image_url"),
+  youtubeUrl: text("youtube_url"),
   authorId: varchar("author_id"),
   submittedBy: varchar("submitted_by"),
   submittedByName: text("submitted_by_name"),

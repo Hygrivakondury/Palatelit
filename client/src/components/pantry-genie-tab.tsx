@@ -147,10 +147,11 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
       });
       if (!res.ok) throw new Error("Failed to generate image");
       const data = await res.json();
-      setGeneratedImages((prev) => ({
-        ...prev,
-        [recipe.id]: `data:${data.mimeType};base64,${data.b64_json}`,
-      }));
+      const preview = data.imageUrl ?? (data.b64_json ? `data:${data.mimeType};base64,${data.b64_json}` : null);
+      if (preview) {
+        setGeneratedImages((prev) => ({ ...prev, [recipe.id]: preview }));
+      }
+      qc.invalidateQueries({ queryKey: ["/api/recipes"] });
     } catch (err) {
       console.error("Image generation failed:", err);
     } finally {
