@@ -1,8 +1,8 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
-  type PantryItem,
+  type PantryItem, type MealPlan,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
@@ -41,6 +41,13 @@ export interface IStorage {
   addPantryItems(userId: string, names: string[]): Promise<PantryItem[]>;
   removePantryItem(userId: string, id: number): Promise<void>;
   clearPantry(userId: string): Promise<void>;
+  // Meal Plans
+  getMealPlansByEmail(userEmail: string): Promise<MealPlan[]>;
+  getMealPlan(userEmail: string, day: string): Promise<MealPlan | undefined>;
+  upsertMealPlan(userEmail: string, day: string, recipeIds: number[]): Promise<MealPlan>;
+  addRecipeToMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
+  removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
+  clearMealPlanDay(userEmail: string, day: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -230,6 +237,45 @@ export class DatabaseStorage implements IStorage {
 
   async clearPantry(userId: string): Promise<void> {
     await db.delete(pantryItems).where(eq(pantryItems.userId, userId));
+  }
+
+  async getMealPlansByEmail(userEmail: string): Promise<MealPlan[]> {
+    return db.select().from(mealPlans).where(eq(mealPlans.userEmail, userEmail));
+  }
+
+  async getMealPlan(userEmail: string, day: string): Promise<MealPlan | undefined> {
+    const [plan] = await db.select().from(mealPlans)
+      .where(and(eq(mealPlans.userEmail, userEmail), eq(mealPlans.day, day)));
+    return plan;
+  }
+
+  async upsertMealPlan(userEmail: string, day: string, recipeIds: number[]): Promise<MealPlan> {
+    const [plan] = await db.insert(mealPlans)
+      .values({ userEmail, day, recipeIds, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [mealPlans.userEmail, mealPlans.day],
+        set: { recipeIds, updatedAt: new Date() },
+      })
+      .returning();
+    return plan;
+  }
+
+  async addRecipeToMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan> {
+    const existing = await this.getMealPlan(userEmail, day);
+    const current = existing?.recipeIds ?? [];
+    const updated = current.includes(recipeId) ? current : [...current, recipeId];
+    return this.upsertMealPlan(userEmail, day, updated);
+  }
+
+  async removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan> {
+    const existing = await this.getMealPlan(userEmail, day);
+    const updated = (existing?.recipeIds ?? []).filter((id) => id !== recipeId);
+    return this.upsertMealPlan(userEmail, day, updated);
+  }
+
+  async clearMealPlanDay(userEmail: string, day: string): Promise<void> {
+    await db.delete(mealPlans)
+      .where(and(eq(mealPlans.userEmail, userEmail), eq(mealPlans.day, day)));
   }
 }
 

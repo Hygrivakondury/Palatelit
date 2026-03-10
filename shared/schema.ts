@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, timestamp, boolean, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, serial, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -144,6 +144,32 @@ export const insertPantryItemSchema = createInsertSchema(pantryItems).omit({
 
 export type PantryItem = typeof pantryItems.$inferSelect;
 export type InsertPantryItem = z.infer<typeof insertPantryItemSchema>;
+
+export const DAYS_OF_WEEK = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+] as const;
+export type DayOfWeek = typeof DAYS_OF_WEEK[number];
+
+export const mealPlans = pgTable("meal_plans", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userEmail: varchar("user_email").notNull(),
+  day: varchar("day", { length: 20 }).notNull(),
+  recipeIds: integer("recipe_ids").array().notNull().default([]),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userEmailDayUnique: unique().on(table.userEmail, table.day),
+}));
+
+export const insertMealPlanSchema = createInsertSchema(mealPlans).omit({
+  id: true,
+  updatedAt: true,
+}).extend({
+  day: z.enum(DAYS_OF_WEEK),
+  recipeIds: z.array(z.number().int().positive()),
+});
+
+export type MealPlan = typeof mealPlans.$inferSelect;
+export type InsertMealPlan = z.infer<typeof insertMealPlanSchema>;
 
 export const CUISINE_TYPES = [
   "North Indian",

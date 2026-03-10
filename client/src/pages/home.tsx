@@ -12,21 +12,23 @@ import { SmartChefChat } from "@/components/smart-chef-chat";
 import { CommunityTab } from "@/components/community-tab";
 import { WeeklyChallengeTab } from "@/components/weekly-challenge-tab";
 import { PantryGenieTab } from "@/components/pantry-genie-tab";
+import { MealPlanTab } from "@/components/meal-plan-tab";
 import {
   Search, Leaf, ChefHat, X, LogOut, Heart, Sparkles,
-  SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag
+  SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import { CUISINE_TYPES } from "@shared/schema";
 
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
-type TabId = "recipes" | "community" | "challenge" | "pantry";
+type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={16} /> },
   { id: "community", label: "Community", icon: <Users size={16} /> },
   { id: "challenge", label: "Weekly Challenge", icon: <Trophy size={16} /> },
   { id: "pantry", label: "Pantry Genie", icon: <ShoppingBag size={16} /> },
+  { id: "mealplan", label: "Meal Plan", icon: <CalendarDays size={16} /> },
 ];
 
 export default function HomePage() {
@@ -401,6 +403,15 @@ export default function HomePage() {
       {activeTab === "pantry" && (
         <PantryGenieTab
           onSelectRecipe={(recipe) => {
+            setSelectedRecipe(recipe);
+            setActiveTab("recipes");
+          }}
+        />
+      )}
+
+      {activeTab === "mealplan" && (
+        <MealPlanTab
+          onViewRecipe={(recipe) => {
             setSelectedRecipe(recipe);
             setActiveTab("recipes");
           }}

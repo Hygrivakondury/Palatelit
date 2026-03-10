@@ -461,6 +461,68 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     }
   });
 
+  // ─── MEAL PLANS ────────────────────────────────────────────────
+  app.get("/api/meal-plans", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const plans = await storage.getMealPlansByEmail(email);
+      res.json(plans);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch meal plans" });
+    }
+  });
+
+  app.get("/api/meal-plans/:day", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      const { day } = req.params;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const plan = await storage.getMealPlan(email, day);
+      res.json(plan ?? { userEmail: email, day, recipeIds: [] });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch meal plan" });
+    }
+  });
+
+  app.post("/api/meal-plans/:day/recipes", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      const { day } = req.params;
+      const { recipeId } = req.body;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      if (typeof recipeId !== "number") return res.status(400).json({ message: "recipeId must be a number" });
+      const plan = await storage.addRecipeToMealPlan(email, day, recipeId);
+      res.json(plan);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to add recipe to meal plan" });
+    }
+  });
+
+  app.delete("/api/meal-plans/:day/recipes/:recipeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      const { day, recipeId } = req.params;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const plan = await storage.removeRecipeFromMealPlan(email, day, parseInt(recipeId));
+      res.json(plan);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to remove recipe from meal plan" });
+    }
+  });
+
+  app.delete("/api/meal-plans/:day", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      const { day } = req.params;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      await storage.clearMealPlanDay(email, day);
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to clear meal plan day" });
+    }
+  });
+
   // ─── AI IMAGE GENERATION ───────────────────────────────────────
   app.post("/api/recipes/:id/generate-image", isAuthenticated, async (req: any, res) => {
     try {

@@ -22,7 +22,8 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
-- **Tab Navigation**: Four-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie) with desktop tab bar + mobile bottom navigation bar
+- **Tab Navigation**: Five-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie / Meal Plan) with desktop tab bar + mobile bottom navigation bar
+- **Meal Plan**: Weekly meal planning tab — pick any day (Mon–Sun), browse and add recipes from the full recipe library, track total cooking time per day, remove individual meals, and view a "Week at a Glance" grid showing meal counts for every day. Plans stored in PostgreSQL keyed by `userEmail + day` (unique constraint), persisted across sessions.
 - **Pantry Genie**: AI-powered pantry management tab powered by Gemini (via Replit AI Integrations)
   - **Photo Analysis**: Upload or snap a photo of your vegetables; Gemini multimodal vision identifies all ingredients and auto-fills a suggestion panel; users select which items to add to their pantry
   - **Persistent Pantry**: User's pantry items stored in PostgreSQL (`pantry_items` table) — persists across sessions, no need to re-upload photos
