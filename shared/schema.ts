@@ -171,6 +171,14 @@ export const insertMealPlanSchema = createInsertSchema(mealPlans).omit({
 export type MealPlan = typeof mealPlans.$inferSelect;
 export type InsertMealPlan = z.infer<typeof insertMealPlanSchema>;
 
+export const shoppingChecked = pgTable("shopping_checked", {
+  userEmail: varchar("user_email").primaryKey(),
+  checkedKeys: text("checked_keys").array().notNull().default([]),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ShoppingChecked = typeof shoppingChecked.$inferSelect;
+
 export const CUISINE_TYPES = [
   "North Indian",
   "South Indian",

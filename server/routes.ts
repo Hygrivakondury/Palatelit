@@ -523,6 +523,78 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     }
   });
 
+  // ─── MEAL PLAN SMARTFILL + CLEAR WEEK ─────────────────────────
+  app.post("/api/meal-plans/smartfill", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const allRecipes = await storage.getRecipes();
+      if (allRecipes.length === 0) return res.status(400).json({ message: "No recipes available" });
+      const shuffled = [...allRecipes].sort(() => Math.random() - 0.5);
+      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      const mealsPerDay = 2;
+      const totalSlots = days.length * mealsPerDay;
+      const slots: number[] = [];
+      for (let i = 0; i < totalSlots; i++) {
+        slots.push(shuffled[i % shuffled.length].id);
+      }
+      for (let i = 0; i < days.length; i++) {
+        await storage.upsertMealPlan(email, days[i], [slots[i * 2], slots[i * 2 + 1]]);
+      }
+      const plans = await storage.getMealPlansByEmail(email);
+      res.json(plans);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to smartfill meal plan" });
+    }
+  });
+
+  app.delete("/api/meal-plans", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      await storage.clearWeekPlan(email);
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to clear week plan" });
+    }
+  });
+
+  // ─── SHOPPING CHECKED ──────────────────────────────────────────
+  app.get("/api/shopping-checked", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const checkedKeys = await storage.getShoppingChecked(email);
+      res.json({ checkedKeys });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch shopping checked state" });
+    }
+  });
+
+  app.post("/api/shopping-checked/toggle", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      const { key } = req.body;
+      if (typeof key !== "string") return res.status(400).json({ message: "key must be a string" });
+      const checkedKeys = await storage.toggleShoppingItem(email, key);
+      res.json({ checkedKeys });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to toggle shopping item" });
+    }
+  });
+
+  app.delete("/api/shopping-checked", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user.claims.email;
+      if (!email) return res.status(400).json({ message: "User email not available" });
+      await storage.clearShoppingChecked(email);
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to clear shopping checked state" });
+    }
+  });
+
   // ─── AI IMAGE GENERATION ───────────────────────────────────────
   app.post("/api/recipes/:id/generate-image", isAuthenticated, async (req: any, res) => {
     try {

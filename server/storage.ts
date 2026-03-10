@@ -1,5 +1,5 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
   type PantryItem, type MealPlan,
@@ -48,6 +48,11 @@ export interface IStorage {
   addRecipeToMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
   removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
   clearMealPlanDay(userEmail: string, day: string): Promise<void>;
+  clearWeekPlan(userEmail: string): Promise<void>;
+  // Shopping Checked
+  getShoppingChecked(userEmail: string): Promise<string[]>;
+  toggleShoppingItem(userEmail: string, key: string): Promise<string[]>;
+  clearShoppingChecked(userEmail: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -276,6 +281,33 @@ export class DatabaseStorage implements IStorage {
   async clearMealPlanDay(userEmail: string, day: string): Promise<void> {
     await db.delete(mealPlans)
       .where(and(eq(mealPlans.userEmail, userEmail), eq(mealPlans.day, day)));
+  }
+
+  async clearWeekPlan(userEmail: string): Promise<void> {
+    await db.delete(mealPlans).where(eq(mealPlans.userEmail, userEmail));
+  }
+
+  async getShoppingChecked(userEmail: string): Promise<string[]> {
+    const [row] = await db.select().from(shoppingChecked).where(eq(shoppingChecked.userEmail, userEmail));
+    return row?.checkedKeys ?? [];
+  }
+
+  async toggleShoppingItem(userEmail: string, key: string): Promise<string[]> {
+    const current = await this.getShoppingChecked(userEmail);
+    const updated = current.includes(key)
+      ? current.filter((k) => k !== key)
+      : [...current, key];
+    await db.insert(shoppingChecked)
+      .values({ userEmail, checkedKeys: updated, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: shoppingChecked.userEmail,
+        set: { checkedKeys: updated, updatedAt: new Date() },
+      });
+    return updated;
+  }
+
+  async clearShoppingChecked(userEmail: string): Promise<void> {
+    await db.delete(shoppingChecked).where(eq(shoppingChecked.userEmail, userEmail));
   }
 }
 
