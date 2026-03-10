@@ -1,7 +1,8 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
+  type PantryItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
@@ -35,6 +36,11 @@ export interface IStorage {
   upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
   adminExists(): Promise<boolean>;
   claimAdmin(userId: string, displayName?: string): Promise<UserProfile>;
+  // Pantry
+  getPantryItems(userId: string): Promise<PantryItem[]>;
+  addPantryItems(userId: string, names: string[]): Promise<PantryItem[]>;
+  removePantryItem(userId: string, id: number): Promise<void>;
+  clearPantry(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -199,6 +205,31 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoUpdate({ target: userProfiles.userId, set: { isAdmin: true } })
       .returning();
     return profile;
+  }
+
+  async getPantryItems(userId: string): Promise<PantryItem[]> {
+    return db.select().from(pantryItems)
+      .where(eq(pantryItems.userId, userId))
+      .orderBy(desc(pantryItems.addedAt));
+  }
+
+  async addPantryItems(userId: string, names: string[]): Promise<PantryItem[]> {
+    const unique = [...new Set(names.map((n) => n.trim().toLowerCase()).filter(Boolean))];
+    if (unique.length === 0) return [];
+    const rows = await db.insert(pantryItems)
+      .values(unique.map((name) => ({ userId, name })))
+      .returning();
+    return rows;
+  }
+
+  async removePantryItem(userId: string, id: number): Promise<void> {
+    await db.delete(pantryItems).where(
+      and(eq(pantryItems.id, id), eq(pantryItems.userId, userId))
+    );
+  }
+
+  async clearPantry(userId: string): Promise<void> {
+    await db.delete(pantryItems).where(eq(pantryItems.userId, userId));
   }
 }
 

@@ -130,6 +130,21 @@ export type InsertCommunityMessage = z.infer<typeof insertCommunityMessageSchema
 
 export type UserProfile = typeof userProfiles.$inferSelect;
 
+export const pantryItems = pgTable("pantry_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const insertPantryItemSchema = createInsertSchema(pantryItems).omit({
+  id: true,
+  addedAt: true,
+});
+
+export type PantryItem = typeof pantryItems.$inferSelect;
+export type InsertPantryItem = z.infer<typeof insertPantryItemSchema>;
+
 export const CUISINE_TYPES = [
   "North Indian",
   "South Indian",

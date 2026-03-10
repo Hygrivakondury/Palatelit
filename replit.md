@@ -22,12 +22,18 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
-- **Tab Navigation**: Three-tab layout (Recipes / Community / Weekly Challenge) with desktop tab bar + mobile bottom navigation bar
-- **Weekly Challenge**: Admin creates weekly cooking challenges with a suggested dish; users submit full recipes (title, description, ingredients, instructions, photo, cuisine type, dietary tags) that auto-appear in the global recipe library; first logged-in user can claim admin rights
+- **Tab Navigation**: Four-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie) with desktop tab bar + mobile bottom navigation bar
+- **Pantry Genie**: AI-powered pantry management tab powered by Gemini (via Replit AI Integrations)
+  - **Photo Analysis**: Upload or snap a photo of your vegetables; Gemini multimodal vision identifies all ingredients and auto-fills a suggestion panel; users select which items to add to their pantry
+  - **Persistent Pantry**: User's pantry items stored in PostgreSQL (`pantry_items` table) — persists across sessions, no need to re-upload photos
+  - **Smart Recipe Matching**: "Find Recipes" scores all 12+ recipes by ingredient overlap with the user's pantry; results sorted by match percentage
+  - **Missing Ingredient Logic**: Each suggestion highlights missing main ingredients (in orange) and missing elevating spices like cumin/garam masala (in amber), so users know exactly what to add
+  - **AI Dish Photo Generation**: "AI Photo" button on each suggestion generates a realistic, beautifully-plated dish photo using OpenAI `gpt-image-1` via Replit AI Integrations
+- **Weekly Challenge**: Admin creates weekly cooking challenges; only two hardcoded email addresses (`genieflavour@gmail.com`, `gurumurthy.sastry@gmail.com`) have admin access (enforced server-side)
 - **Community Recipes**: Dedicated Community tab showing all user-submitted recipes with author info; each card has View (opens recipe modal) and Chat buttons
-- **Community Chat**: Per-recipe chat window where users can message the recipe author and other cooks — for questions like "where do I find this ingredient?" etc.
-- **User Recipe Library**: Submitted recipes appear in both the global recipe library (Recipes tab) and the submitter's personal library (visible in Weekly Challenge tab)
-- **Admin System**: First-claim admin model — first user to click "Claim Admin" gets admin rights; admin can create/end challenges; admin badge shown in user menu
+- **Community Chat**: Per-recipe chat window where users can message the recipe author and other cooks
+- **User Recipe Library**: Submitted recipes appear in both the global recipe library and the submitter's personal library
+- **Admin System**: Two hardcoded admin emails enforced server-side; no self-claim possible; admin badge shown in user menu
 - **Green & Gold theme**: Professional, elegant design using Open Sans + Lora fonts
 
 ## Project Structure
@@ -72,6 +78,13 @@ shared/
 - `GET  /api/auth/user` — Current user
 - `GET  /api/login` — Begin login flow
 - `GET  /api/logout` — Logout
+- `GET  /api/pantry` — Get current user's pantry items (authenticated)
+- `POST /api/pantry/items` — Add items to pantry `{ names: string[] }` (authenticated)
+- `DEL  /api/pantry/items/:id` — Remove a pantry item (authenticated)
+- `DEL  /api/pantry` — Clear all pantry items (authenticated)
+- `POST /api/pantry/analyze-photo` — Multipart photo → Gemini identifies ingredients, returns `{ ingredients: string[] }` (authenticated)
+- `POST /api/pantry/suggest` — Score all recipes vs user's pantry, return top 6 with missing ingredient analysis (authenticated)
+- `POST /api/recipes/:id/generate-image` — Generate AI dish photo with gpt-image-1, returns `{ b64_json, mimeType }` (authenticated)
 
 ## Running
 

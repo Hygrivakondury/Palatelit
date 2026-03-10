@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES } from "@shared/schema";
@@ -13,6 +14,31 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
+});
+
+const COMMON_SPICES = new Set([
+  "cumin", "cumin seeds", "jeera", "garam masala", "coriander powder", "turmeric",
+  "turmeric powder", "red chilli powder", "chilli powder", "mustard seeds", "curry leaves",
+  "asafoetida", "hing", "bay leaves", "cardamom", "cloves", "cinnamon", "fenugreek",
+  "kasuri methi", "amchur", "tamarind", "salt", "oil", "ghee", "butter", "water",
+  "pepper", "black pepper", "dried red chillies", "green chillies", "ginger",
+  "ginger-garlic paste", "garlic", "lemon juice", "sugar", "fresh coriander",
+]);
+
+function classifyMissing(recipeIngredient: string, pantrySet: Set<string>): "main" | "spice" | null {
+  const lower = recipeIngredient.toLowerCase();
+  const inPantry = [...pantrySet].some((item) => lower.includes(item) || item.includes(lower));
+  if (inPantry) return null;
+  const isSpice = [...COMMON_SPICES].some((s) => lower.includes(s));
+  return isSpice ? "spice" : "main";
+}
 
 const ADMIN_EMAILS = new Set([
   "genieflavour@gmail.com",
@@ -303,6 +329,164 @@ export async function registerRoutes(
 
   app.post("/api/claim-admin", isAuthenticated, (_req, res) => {
     res.status(403).json({ message: "Admin access is restricted to authorised accounts only." });
+  });
+
+  // ─── PANTRY ────────────────────────────────────────────────────
+  app.get("/api/pantry", isAuthenticated, async (req: any, res) => {
+    try {
+      const items = await storage.getPantryItems(req.user.claims.sub);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch pantry" });
+    }
+  });
+
+  app.post("/api/pantry/items", isAuthenticated, async (req: any, res) => {
+    try {
+      const { names } = req.body;
+      if (!Array.isArray(names) || names.length === 0) {
+        return res.status(400).json({ message: "names array required" });
+      }
+      const items = await storage.addPantryItems(req.user.claims.sub, names);
+      res.status(201).json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to add pantry items" });
+    }
+  });
+
+  app.delete("/api/pantry/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.removePantryItem(req.user.claims.sub, parseInt(req.params.id));
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to remove item" });
+    }
+  });
+
+  app.delete("/api/pantry", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.clearPantry(req.user.claims.sub);
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to clear pantry" });
+    }
+  });
+
+  app.post("/api/pantry/analyze-photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "Photo required" });
+
+      const imageData = fs.readFileSync(req.file.path).toString("base64");
+      const mimeType = req.file.mimetype as string;
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: { mimeType, data: imageData },
+              },
+              {
+                text: `You are a vegetable and ingredient identification expert.
+Look at this image and identify ALL vegetables, fruits, legumes, grains, and cooking ingredients visible.
+Return ONLY a valid JSON array of ingredient names in English, lowercase, singular form.
+Example: ["spinach", "potato", "tomato", "onion", "garlic"]
+Do NOT include non-food items, cooking utensils, or packaging text.
+Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
+              },
+            ],
+          },
+        ],
+      });
+
+      fs.unlinkSync(req.file.path);
+
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+      let ingredients: string[] = [];
+      try {
+        const cleaned = text.replace(/```json|```/g, "").trim();
+        ingredients = JSON.parse(cleaned);
+        if (!Array.isArray(ingredients)) ingredients = [];
+      } catch {
+        ingredients = [];
+      }
+
+      res.json({ ingredients });
+    } catch (err) {
+      if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      console.error("Photo analysis error:", err);
+      res.status(500).json({ message: "Failed to analyse photo" });
+    }
+  });
+
+  app.post("/api/pantry/suggest", isAuthenticated, async (req: any, res) => {
+    try {
+      const pantry = await storage.getPantryItems(req.user.claims.sub);
+      if (pantry.length === 0) {
+        return res.json({ suggestions: [] });
+      }
+      const pantrySet = new Set(pantry.map((p) => p.name.toLowerCase()));
+      const allRecipes = await storage.getRecipes();
+
+      const scored = allRecipes.map((recipe) => {
+        let matches = 0;
+        const missingMain: string[] = [];
+        const missingSpices: string[] = [];
+
+        for (const ingredient of recipe.ingredients) {
+          const type = classifyMissing(ingredient, pantrySet);
+          if (type === null) {
+            matches++;
+          } else if (type === "main") {
+            missingMain.push(ingredient.replace(/\(.*?\)/g, "").split(",")[0].trim());
+          } else {
+            missingSpices.push(ingredient.replace(/\(.*?\)/g, "").split(",")[0].trim());
+          }
+        }
+
+        const matchPct = Math.round((matches / Math.max(recipe.ingredients.length, 1)) * 100);
+        return { recipe, matchPct, missingMain: missingMain.slice(0, 4), missingSpices: missingSpices.slice(0, 4) };
+      });
+
+      const top = scored
+        .filter((s) => s.matchPct > 0)
+        .sort((a, b) => b.matchPct - a.matchPct)
+        .slice(0, 6);
+
+      res.json({ suggestions: top });
+    } catch (err) {
+      console.error("Suggest error:", err);
+      res.status(500).json({ message: "Failed to generate suggestions" });
+    }
+  });
+
+  // ─── AI IMAGE GENERATION ───────────────────────────────────────
+  app.post("/api/recipes/:id/generate-image", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recipe = await storage.getRecipe(id);
+      if (!recipe) return res.status(404).json({ message: "Recipe not found" });
+
+      const prompt = `A high-quality, realistic food photography photo of ${recipe.title}, an Indian vegetarian dish. 
+Beautifully plated on a traditional ceramic or copper serving dish, styled with garnishes like fresh coriander, 
+lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
+Shot from slightly above, clean background. Photorealistic, appetising.`;
+
+      const imageResponse = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        size: "1024x1024",
+      });
+
+      const b64 = imageResponse.data[0]?.b64_json;
+      if (!b64) return res.status(500).json({ message: "No image returned" });
+
+      res.json({ b64_json: b64, mimeType: "image/png" });
+    } catch (err) {
+      console.error("Image generation error:", err);
+      res.status(500).json({ message: "Failed to generate image" });
+    }
   });
 
   // ─── SMART CHEF AI ────────────────────────────────────────────
