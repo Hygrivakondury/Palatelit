@@ -14,6 +14,15 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const ADMIN_EMAILS = new Set([
+  "genieflavour@gmail.com",
+  "gurumurthy.sastry@gmail.com",
+]);
+
+function isAdminEmail(email: string | undefined | null): boolean {
+  return !!email && ADMIN_EMAILS.has(email.toLowerCase().trim());
+}
+
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -214,14 +223,15 @@ export async function registerRoutes(
 
   app.post("/api/challenges", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const profile = await storage.getUserProfile(userId);
-      if (!profile?.isAdmin) return res.status(403).json({ message: "Admin only" });
+      const user = req.user.claims;
+      if (!isAdminEmail(user.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
 
       const parsed = insertChallengeSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid challenge data" });
 
-      const challenge = await storage.createChallenge(parsed.data, userId);
+      const challenge = await storage.createChallenge(parsed.data, user.sub);
       res.status(201).json(challenge);
     } catch (err) {
       console.error("Error creating challenge:", err);
@@ -231,9 +241,10 @@ export async function registerRoutes(
 
   app.patch("/api/challenges/:id/toggle", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const profile = await storage.getUserProfile(userId);
-      if (!profile?.isAdmin) return res.status(403).json({ message: "Admin only" });
+      const user = req.user.claims;
+      if (!isAdminEmail(user.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
 
       const id = parseInt(req.params.id);
       const updated = await storage.toggleChallengeActive(id);
@@ -279,35 +290,19 @@ export async function registerRoutes(
   // ─── USER PROFILE / ADMIN ─────────────────────────────────────
   app.get("/api/my-profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const profile = await storage.getUserProfile(userId);
-      res.json(profile ?? { userId, isAdmin: false });
+      const user = req.user.claims;
+      res.json({
+        userId: user.sub,
+        isAdmin: isAdminEmail(user.email),
+        email: user.email,
+      });
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch profile" });
     }
   });
 
-  app.post("/api/claim-admin", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = req.user.claims;
-      const alreadyExists = await storage.adminExists();
-      if (alreadyExists) {
-        const profile = await storage.getUserProfile(userId);
-        if (!profile?.isAdmin) {
-          return res.status(403).json({ message: "An admin already exists" });
-        }
-        return res.json(profile);
-      }
-      const displayName = user.first_name
-        ? `${user.first_name} ${user.last_name ?? ""}`.trim()
-        : user.email ?? "Admin";
-      const profile = await storage.claimAdmin(userId, displayName);
-      res.json(profile);
-    } catch (err) {
-      console.error("Error claiming admin:", err);
-      res.status(500).json({ message: "Failed to claim admin" });
-    }
+  app.post("/api/claim-admin", isAuthenticated, (_req, res) => {
+    res.status(403).json({ message: "Admin access is restricted to authorised accounts only." });
   });
 
   // ─── SMART CHEF AI ────────────────────────────────────────────

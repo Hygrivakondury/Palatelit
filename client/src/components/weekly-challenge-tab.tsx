@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Trophy, Plus, X, ChevronDown, ChevronUp, Loader2,
-  Flame, CheckCircle2, Clock, Crown
+  Flame, CheckCircle2, Clock
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { RecipeSubmitForm } from "@/components/recipe-submit-form";
@@ -96,16 +96,6 @@ export function WeeklyChallengeTab({ profile, currentUserId }: WeeklyChallengeTa
     },
   });
 
-  const claimAdminMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/claim-admin", {});
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/my-profile"] });
-    },
-  });
-
   const myChallenge = activeChallenge
     ? myRecipes.find((r) => r.challengeId === activeChallenge.id)
     : null;
@@ -132,31 +122,6 @@ export function WeeklyChallengeTab({ profile, currentUserId }: WeeklyChallengeTa
           </Button>
         )}
       </div>
-
-      {!isAdmin && !loadingActive && (
-        <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl p-4 border border-neutral-200 dark:border-neutral-700">
-          <div className="flex items-center gap-3">
-            <Crown size={20} className="text-amber-500" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">Are you the app admin?</p>
-              <p className="text-xs text-neutral-500">Claim admin rights to create and manage weekly challenges.</p>
-            </div>
-            <Button
-              data-testid="button-claim-admin"
-              size="sm"
-              variant="outline"
-              className="flex-shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50"
-              onClick={() => claimAdminMutation.mutate()}
-              disabled={claimAdminMutation.isPending}
-            >
-              {claimAdminMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : "Claim Admin"}
-            </Button>
-          </div>
-          {claimAdminMutation.isError && (
-            <p className="text-xs text-red-500 mt-2">An admin already exists. Only one admin is allowed.</p>
-          )}
-        </div>
-      )}
 
       {isAdmin && showCreateForm && (
         <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-amber-200 p-5 shadow-sm">
