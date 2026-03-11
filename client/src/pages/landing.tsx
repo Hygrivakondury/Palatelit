@@ -63,7 +63,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">12,000+</span> home cooks trust Flavour Genie
+                <span className="font-semibold text-foreground">Trusted by 1000s</span> of home cooks
               </p>
             </div>
           </div>
