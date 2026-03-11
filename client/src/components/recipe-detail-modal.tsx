@@ -208,8 +208,8 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
 
-          {/* Action buttons over image */}
-          <div className="absolute top-3 right-3 flex gap-2">
+          {/* Action buttons over image — right-11 keeps buttons clear of the Dialog close button */}
+          <div className="absolute top-3 right-11 flex gap-2">
             {/* Share button */}
             <button
               onClick={() => setShowShare(true)}

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Check, Share2, Mail, X } from "lucide-react";
-import { SiWhatsapp, SiX, SiFacebook, SiTelegram, SiInstagram, SiReddit, SiLinkedin } from "react-icons/si";
+import { Copy, Check, Share2 } from "lucide-react";
+import { SiWhatsapp, SiFacebook, SiTelegram, SiInstagram, SiReddit } from "react-icons/si";
 import type { Recipe } from "@shared/schema";
 
 interface ShareRecipeSheetProps {
@@ -45,36 +45,12 @@ const PLATFORMS = [
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
   },
   {
-    id: "twitter",
-    label: "X (Twitter)",
-    icon: SiX,
-    color: "bg-black hover:bg-neutral-800 text-white",
-    getUrl: (text: string, url: string) =>
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-  },
-  {
     id: "reddit",
     label: "Reddit",
     icon: SiReddit,
     color: "bg-[#FF4500] hover:bg-[#e03d00] text-white",
     getUrl: (text: string, url: string) =>
       `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`,
-  },
-  {
-    id: "linkedin",
-    label: "LinkedIn",
-    icon: SiLinkedin,
-    color: "bg-[#0A66C2] hover:bg-[#0958a8] text-white",
-    getUrl: (text: string, url: string) =>
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "email",
-    label: "Email",
-    icon: Mail,
-    color: "bg-muted hover:bg-muted/80 text-foreground border border-border",
-    getUrl: (text: string, url: string) =>
-      `mailto:?subject=${encodeURIComponent(`Recipe: ${text.split("\n")[0].replace("🍽️ ", "").split(" —")[0]}`)}&body=${encodeURIComponent(`${text}\n\n${url}`)}`,
   },
 ];
 
@@ -162,7 +138,7 @@ export function ShareRecipeSheet({ recipe, onClose }: ShareRecipeSheetProps) {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Share on
             </p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {PLATFORMS.map((platform) => (
                 <button
                   key={platform.id}

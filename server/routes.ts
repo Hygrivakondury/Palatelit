@@ -743,6 +743,10 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
 - servings: number (number of servings, integer, default 4)
 - cuisineType: string (one of: North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Pan-Indian, Fusion)
 - dietaryTags: string[] (subset of exactly these values: ["Vegan", "Gluten-Free", "Jain Friendly"])
+- category: string (IMPORTANT: classify the recipe into exactly one of these three values:
+    "dessert" — for sweets, mithai, halwa, kheer, ladoo, barfi, pudding, cake, ice cream, or any sweet dish
+    "mocktail" — for juices, lassi, sherbets, shakes, smoothies, nimbu pani, drinks, beverages, or any drinkable recipe
+    "main" — for everything else: curries, rice dishes, breads, snacks, dals, sabzi, street food, breakfast items, etc.)
 
 Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
           },
@@ -779,6 +783,9 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
         req.user.claims.email?.split("@")[0] ||
         "Community Member";
 
+      const validCategories = ["main", "dessert", "mocktail"];
+      const detectedCategory = validCategories.includes(recipeData.category) ? recipeData.category : "main";
+
       const newRecipe = await storage.createRecipe({
         title: recipeData.title,
         description: recipeData.description || "",
@@ -789,6 +796,7 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
         servings: Number(recipeData.servings) || 4,
         cuisineType: recipeData.cuisineType || "Pan-Indian",
         dietaryTags: Array.isArray(recipeData.dietaryTags) ? recipeData.dietaryTags : [],
+        category: detectedCategory,
         youtubeUrl,
         isUserSubmitted: true,
         authorId: req.user.claims.sub,
