@@ -1,12 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { Clock, Users, ChefHat, Heart } from "lucide-react";
+import { Clock, Users, ChefHat, Heart, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Recipe } from "@shared/schema";
 
 interface RecipeCardProps {
   recipe: Recipe;
   onClick: () => void;
   isFavorited?: boolean;
+  isAdmin?: boolean;
 }
 
 const cuisineColors: Record<string, string> = {
@@ -43,11 +47,36 @@ const dietaryTagStyles: Record<string, string> = {
   "Jain Friendly": "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400",
 };
 
-export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardProps) {
+export default function RecipeCard({ recipe, onClick, isFavorited, isAdmin }: RecipeCardProps) {
   const totalTime = recipe.prepTime + recipe.cookTime;
   const badgeClass = cuisineColors[recipe.cuisineType] ?? "bg-muted text-muted-foreground border-border";
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
   const [imgError, setImgError] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/recipes/${recipe.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/recipes"] });
+      qc.invalidateQueries({ queryKey: ["/api/recipes/community"] });
+      toast({ title: "Recipe deleted", description: `"${recipe.title}" has been removed.` });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", description: "Could not delete this recipe.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      deleteMutation.mutate();
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  };
 
   return (
     <div
@@ -78,6 +107,22 @@ export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardP
           <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 dark:bg-black/70 flex items-center justify-center shadow-sm">
             <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
           </div>
+        )}
+        {isAdmin && (
+          <button
+            data-testid={`button-delete-recipe-${recipe.id}`}
+            onClick={handleDeleteClick}
+            disabled={deleteMutation.isPending}
+            title={confirmDelete ? "Click again to confirm delete" : "Delete recipe"}
+            className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium shadow transition-all ${
+              confirmDelete
+                ? "bg-red-600 text-white"
+                : "bg-white/90 dark:bg-black/70 text-red-500 hover:bg-red-600 hover:text-white"
+            }`}
+          >
+            <Trash2 className="w-3 h-3" />
+            {confirmDelete ? "Confirm?" : "Delete"}
+          </button>
         )}
       </div>
 

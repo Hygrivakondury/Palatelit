@@ -478,6 +478,7 @@ export default function HomePage() {
                   recipe={recipe}
                   onClick={() => setSelectedRecipe(recipe)}
                   isFavorited={favoritedRecipeIds.has(recipe.id)}
+                  isAdmin={myProfile?.isAdmin ?? false}
                 />
               ))}
             </div>
@@ -500,6 +501,7 @@ export default function HomePage() {
         <CommunityTab
           currentUserId={currentUserId}
           onRecipeUpdated={() => queryClient.invalidateQueries({ queryKey: ["/api/recipes/community"] })}
+          isAdmin={myProfile?.isAdmin ?? false}
         />
       )}
 

@@ -1,24 +1,30 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Clock, Users, ChefHat, Eye } from "lucide-react";
+import { MessageCircle, Clock, Users, ChefHat, Eye, Trash2 } from "lucide-react";
 import { CommunityChat } from "@/components/community-chat";
 import RecipeDetailModal from "@/components/recipe-detail-modal";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Recipe } from "@shared/schema";
 
 interface CommunityTabProps {
   currentUserId: string;
   onRecipeUpdated?: (recipe: Recipe) => void;
+  isAdmin?: boolean;
 }
 
-export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabProps) {
+export function CommunityTab({ currentUserId, onRecipeUpdated, isAdmin }: CommunityTabProps) {
   const [chatRecipe, setChatRecipe] = useState<Recipe | null>(null);
   const [viewRecipe, setViewRecipe] = useState<Recipe | null>(null);
   const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const onImgError = useCallback((id: number) => setImgErrors(prev => new Set([...prev, id])), []);
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
   const { data: recipes = [], isLoading } = useQuery<Recipe[]>({
     queryKey: ["/api/recipes/community"],
@@ -27,12 +33,34 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
       if (!res.ok) throw new Error("Failed to load community recipes");
       return res.json();
     },
-    // Keep polling every 8s while any recipe is still missing its AI-generated image
     refetchInterval: (query) => {
       const data = query.state.data;
       return data?.some((r: Recipe) => !r.imageUrl) ? 8000 : false;
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/recipes/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/recipes/community"] });
+      qc.invalidateQueries({ queryKey: ["/api/recipes"] });
+      setConfirmDelete(null);
+      toast({ title: "Recipe deleted", description: "The community recipe has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", description: "Could not delete this recipe.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (confirmDelete === id) {
+      deleteMutation.mutate(id);
+    } else {
+      setConfirmDelete(id);
+      setTimeout(() => setConfirmDelete(prev => prev === id ? null : prev), 3000);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
@@ -91,6 +119,21 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
                   <div className="absolute top-2 left-2">
                     <Badge className="bg-amber-500 text-white text-xs">Challenge</Badge>
                   </div>
+                )}
+                {isAdmin && (
+                  <button
+                    data-testid={`button-delete-community-${recipe.id}`}
+                    onClick={(e) => handleDeleteClick(e, recipe.id)}
+                    disabled={deleteMutation.isPending}
+                    className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium shadow transition-all ${
+                      confirmDelete === recipe.id
+                        ? "bg-red-600 text-white"
+                        : "bg-white/90 dark:bg-black/70 text-red-500 hover:bg-red-600 hover:text-white"
+                    }`}
+                  >
+                    <Trash2 size={11} />
+                    {confirmDelete === recipe.id ? "Confirm?" : "Delete"}
+                  </button>
                 )}
               </div>
 
@@ -153,6 +196,7 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
           recipe={chatRecipe}
           currentUserId={currentUserId}
           onClose={() => setChatRecipe(null)}
+          isAdmin={isAdmin}
         />
       )}
 

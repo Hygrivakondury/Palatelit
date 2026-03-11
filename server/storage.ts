@@ -57,6 +57,9 @@ export interface IStorage {
   // Affiliate Links
   getAffiliateLinks(): Promise<AffiliateLink[]>;
   upsertAffiliateLink(slot: AffiliateSlot, data: Partial<Omit<AffiliateLink, "id" | "slot">>, updatedBy: string): Promise<AffiliateLink>;
+  // Admin delete
+  deleteRecipe(id: number): Promise<void>;
+  deleteCommunityMessage(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -353,6 +356,17 @@ export class DatabaseStorage implements IStorage {
 
   async clearShoppingChecked(userEmail: string): Promise<void> {
     await db.delete(shoppingChecked).where(eq(shoppingChecked.userEmail, userEmail));
+  }
+
+  async deleteRecipe(id: number): Promise<void> {
+    await db.delete(favorites).where(eq(favorites.recipeId, id));
+    await db.delete(reviews).where(eq(reviews.recipeId, id));
+    await db.delete(communityMessages).where(eq(communityMessages.recipeId, id));
+    await db.delete(recipes).where(eq(recipes.id, id));
+  }
+
+  async deleteCommunityMessage(id: number): Promise<void> {
+    await db.delete(communityMessages).where(eq(communityMessages.id, id));
   }
 
   async getAffiliateLinks(): Promise<AffiliateLink[]> {

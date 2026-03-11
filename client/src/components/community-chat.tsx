@@ -3,20 +3,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Send, MessageCircle, Loader2 } from "lucide-react";
+import { X, Send, MessageCircle, Loader2, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { CommunityMessage, Recipe } from "@shared/schema";
 
 interface CommunityChatProps {
   recipe: Recipe;
   currentUserId: string;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
-export function CommunityChat({ recipe, currentUserId, onClose }: CommunityChatProps) {
+export function CommunityChat({ recipe, currentUserId, onClose, isAdmin }: CommunityChatProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const { data: messages = [], isLoading } = useQuery<CommunityMessage[]>({
     queryKey: ["/api/community-messages", recipe.id],
@@ -36,6 +39,17 @@ export function CommunityChat({ recipe, currentUserId, onClose }: CommunityChatP
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/community-messages", recipe.id] });
       setInput("");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/community/messages/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/community-messages", recipe.id] });
+      toast({ title: "Message deleted" });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", variant: "destructive" });
     },
   });
 
@@ -127,7 +141,20 @@ export function CommunityChat({ recipe, currentUserId, onClose }: CommunityChatP
                     >
                       {msg.content}
                     </div>
-                    <span className="text-xs text-neutral-400 px-1">{formatTime(msg.createdAt)}</span>
+                    <div className="flex items-center gap-1.5 px-1">
+                      <span className="text-xs text-neutral-400">{formatTime(msg.createdAt)}</span>
+                      {isAdmin && (
+                        <button
+                          data-testid={`button-delete-message-${msg.id}`}
+                          onClick={() => deleteMutation.mutate(msg.id)}
+                          disabled={deleteMutation.isPending}
+                          title="Delete message"
+                          className="p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

@@ -260,6 +260,35 @@ export async function registerRoutes(
     }
   });
 
+  // ─── ADMIN DELETE ──────────────────────────────────────────────────
+  app.delete("/api/recipes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      await storage.deleteRecipe(id);
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete recipe" });
+    }
+  });
+
+  app.delete("/api/community/messages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      await storage.deleteCommunityMessage(id);
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete message" });
+    }
+  });
+
   // ─── REVIEWS ──────────────────────────────────────────────────
   app.get("/api/recipes/:id/reviews", async (req, res) => {
     try {
