@@ -363,7 +363,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
       <div>
         <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
           <ShoppingBag size={24} className="text-primary" />
-          Pantry Genie
+          Pantry Recipe
         </h2>
         <p className="text-neutral-500 text-sm mt-1">
           Tell us what's in your kitchen — we'll find the perfect recipes for you.

@@ -76,7 +76,7 @@ export default function LandingPage() {
                     <Search className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Genie Filter</p>
+                    <p className="text-xs text-muted-foreground">Recipe Filter</p>
                     <p className="text-sm font-medium text-foreground">What's in your kitchen?</p>
                   </div>
                 </div>
@@ -133,7 +133,7 @@ export default function LandingPage() {
                 icon: <Search className="w-6 h-6 text-primary" />,
                 step: "01",
                 title: "Enter Your Ingredients",
-                desc: "Type in what you have — paneer, dal, vegetables, spices. The Genie Filter understands natural language.",
+                desc: "Type in what you have — paneer, dal, vegetables, spices. The Recipe Filter understands natural language.",
               },
               {
                 icon: <Sparkles className="w-6 h-6 text-primary" />,
@@ -202,7 +202,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { name: "Priya S.", location: "Bengaluru", quote: "I finally stopped wasting vegetables. Palate Lit always has a recipe for whatever's in my fridge!", stars: 5 },
-              { name: "Rahul M.", location: "Delhi", quote: "The Genie Filter is magic. I typed 'dal and some spices' and got 12 authentic recipes instantly.", stars: 5 },
+              { name: "Rahul M.", location: "Delhi", quote: "The Recipe Filter is magic. I typed 'dal and some spices' and got 12 authentic recipes instantly.", stars: 5 },
               { name: "Meera K.", location: "Mumbai", quote: "As a Gujarati, I was skeptical. But the regional recipe accuracy is truly impressive.", stars: 5 },
             ].map((t, i) => (
               <div key={i} className="bg-card border border-card-border rounded-2xl p-6 space-y-4">
