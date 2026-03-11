@@ -26,6 +26,7 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
+- **Smart Commerce**: Affiliate link layer on every recipe — "Get Ingredients Fast" section with 3 configurable slots (Amazon, Blinkit, Flipkart); intelligent deep-linking opens native app if installed, falls back to browser URL; affiliate disclosure text auto-shown; admin-only `/admin` page to manage all links
 - **Tab Navigation**: Five-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie / Meal Plan) with desktop tab bar + mobile bottom navigation bar
 - **Meal Plan**: Full weekly meal planning tab with:
   - **Smartfill Plan**: One-click auto-fills all 7 days with 2 randomly shuffled recipes per day from the library

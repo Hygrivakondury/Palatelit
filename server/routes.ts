@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES } from "@shared/schema";
+import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES, AFFILIATE_SLOTS, type AffiliateSlot } from "@shared/schema";
 import { seedRecipes } from "./seed";
 import { sendContributionEmail } from "./email";
 
@@ -873,6 +873,31 @@ Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet 
       } else {
         res.status(500).json({ message: "Failed to get AI response" });
       }
+    }
+  });
+
+  // Affiliate links — public read
+  app.get("/api/affiliate-links", async (_req, res) => {
+    try {
+      const links = await storage.getAffiliateLinks();
+      res.json(links);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch affiliate links" });
+    }
+  });
+
+  // Affiliate links — admin update
+  app.put("/api/affiliate-links/:slot", isAuthenticated, async (req: any, res) => {
+    try {
+      const email = req.user?.claims?.email;
+      if (!isAdminEmail(email)) return res.status(403).json({ message: "Admin only" });
+      const slot = req.params.slot as AffiliateSlot;
+      if (!AFFILIATE_SLOTS.includes(slot)) return res.status(400).json({ message: "Invalid slot" });
+      const { label, buttonText, webUrl, deepLinkUrl, isActive } = req.body;
+      const updated = await storage.upsertAffiliateLink(slot, { label, buttonText, webUrl, deepLinkUrl, isActive }, email);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update affiliate link" });
     }
   });
 

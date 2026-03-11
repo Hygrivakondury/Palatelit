@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ const RECIPE_SUB_TABS: { id: RecipeSubTab; label: string; icon: React.ReactNode;
 export default function HomePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<TabId>("recipes");
   const [recipeSubTab, setRecipeSubTab] = useState<RecipeSubTab>("main");
   const [searchQuery, setSearchQuery] = useState("");
@@ -227,6 +229,15 @@ export default function HomePage() {
                     </span>
                   )}
                 </DropdownMenuItem>
+                {myProfile?.isAdmin && (
+                  <DropdownMenuItem
+                    className="gap-2 cursor-pointer text-amber-700 focus:text-amber-700 focus:bg-amber-50"
+                    onClick={() => navigate("/admin")}
+                    data-testid="menu-item-admin"
+                  >
+                    <ShoppingBag className="w-4 h-4" /> Smart Commerce
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <a href="/api/logout" className="gap-2 cursor-pointer text-destructive focus:text-destructive" data-testid="menu-item-logout">
                     <LogOut className="w-4 h-4" /> Sign Out

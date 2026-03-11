@@ -205,6 +205,57 @@ export const shoppingChecked = pgTable("shopping_checked", {
 
 export type ShoppingChecked = typeof shoppingChecked.$inferSelect;
 
+export const affiliateLinks = pgTable("affiliate_links", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slot: varchar("slot", { length: 20 }).notNull().unique(),
+  label: text("label").notNull(),
+  buttonText: text("button_text").notNull(),
+  webUrl: text("web_url").notNull(),
+  deepLinkUrl: text("deep_link_url").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by"),
+});
+
+export const insertAffiliateLinkSchema = createInsertSchema(affiliateLinks).omit({
+  id: true,
+  updatedAt: true,
+  updatedBy: true,
+});
+
+export type AffiliateLink = typeof affiliateLinks.$inferSelect;
+export type InsertAffiliateLink = z.infer<typeof insertAffiliateLinkSchema>;
+
+export const AFFILIATE_SLOTS = ["amazon", "blinkit", "flipkart"] as const;
+export type AffiliateSlot = typeof AFFILIATE_SLOTS[number];
+
+export const AFFILIATE_DEFAULTS: Record<AffiliateSlot, Omit<AffiliateLink, "id" | "updatedAt" | "updatedBy">> = {
+  amazon: {
+    slot: "amazon",
+    label: "Amazon",
+    buttonText: "Buy Spices on Amazon",
+    webUrl: "https://www.amazon.in/s?k=indian+spices+masala",
+    deepLinkUrl: "amzn://link.amazon.in/redirect?url=https%3A%2F%2Fwww.amazon.in%2Fs%3Fk%3Dindian%2Bspices",
+    isActive: true,
+  },
+  blinkit: {
+    slot: "blinkit",
+    label: "Blinkit",
+    buttonText: "Order Fresh Veggies on Blinkit",
+    webUrl: "https://blinkit.com/s/?q=fresh+vegetables",
+    deepLinkUrl: "blinkit://search?q=fresh+vegetables",
+    isActive: true,
+  },
+  flipkart: {
+    slot: "flipkart",
+    label: "Flipkart",
+    buttonText: "Kitchen Essentials on Flipkart",
+    webUrl: "https://www.flipkart.com/search?q=kitchen+essentials+cookware",
+    deepLinkUrl: "flipkart://search?q=kitchen+essentials",
+    isActive: true,
+  },
+};
+
 export const CUISINE_TYPES = [
   "North Indian",
   "South Indian",

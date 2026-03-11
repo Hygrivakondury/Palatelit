@@ -1,8 +1,8 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
-  type PantryItem, type MealPlan, type MealType,
+  type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
@@ -54,6 +54,9 @@ export interface IStorage {
   getShoppingChecked(userEmail: string): Promise<string[]>;
   toggleShoppingItem(userEmail: string, key: string): Promise<string[]>;
   clearShoppingChecked(userEmail: string): Promise<void>;
+  // Affiliate Links
+  getAffiliateLinks(): Promise<AffiliateLink[]>;
+  upsertAffiliateLink(slot: AffiliateSlot, data: Partial<Omit<AffiliateLink, "id" | "slot">>, updatedBy: string): Promise<AffiliateLink>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -350,6 +353,48 @@ export class DatabaseStorage implements IStorage {
 
   async clearShoppingChecked(userEmail: string): Promise<void> {
     await db.delete(shoppingChecked).where(eq(shoppingChecked.userEmail, userEmail));
+  }
+
+  async getAffiliateLinks(): Promise<AffiliateLink[]> {
+    const existing = await db.select().from(affiliateLinks);
+    if (existing.length === AFFILIATE_SLOTS.length) return existing;
+    for (const slot of AFFILIATE_SLOTS) {
+      const found = existing.find((l) => l.slot === slot);
+      if (!found) {
+        const defaults = AFFILIATE_DEFAULTS[slot];
+        await db.insert(affiliateLinks).values({
+          slot: defaults.slot,
+          label: defaults.label,
+          buttonText: defaults.buttonText,
+          webUrl: defaults.webUrl,
+          deepLinkUrl: defaults.deepLinkUrl,
+          isActive: defaults.isActive,
+        }).onConflictDoNothing();
+      }
+    }
+    return await db.select().from(affiliateLinks);
+  }
+
+  async upsertAffiliateLink(slot: AffiliateSlot, data: Partial<Omit<AffiliateLink, "id" | "slot">>, updatedBy: string): Promise<AffiliateLink> {
+    const existing = await db.select().from(affiliateLinks).where(eq(affiliateLinks.slot, slot)).limit(1);
+    if (existing.length === 0) {
+      const defaults = AFFILIATE_DEFAULTS[slot];
+      const [created] = await db.insert(affiliateLinks).values({
+        slot,
+        label: data.label ?? defaults.label,
+        buttonText: data.buttonText ?? defaults.buttonText,
+        webUrl: data.webUrl ?? defaults.webUrl,
+        deepLinkUrl: data.deepLinkUrl ?? defaults.deepLinkUrl,
+        isActive: data.isActive ?? defaults.isActive,
+        updatedBy,
+      }).returning();
+      return created;
+    }
+    const [updated] = await db.update(affiliateLinks)
+      .set({ ...data, updatedAt: new Date(), updatedBy })
+      .where(eq(affiliateLinks.slot, slot))
+      .returning();
+    return updated;
   }
 }
 

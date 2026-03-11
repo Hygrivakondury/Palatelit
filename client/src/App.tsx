@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import HomePage from "@/pages/home";
+import AdminPage from "@/pages/admin";
 import { useAuth } from "@/hooks/use-auth";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
         }
         return isAuthenticated ? <HomePage /> : <LandingPage />;
       }} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );

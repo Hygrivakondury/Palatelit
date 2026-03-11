@@ -10,12 +10,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Clock, Users, ChefHat, CheckCircle2, Flame, Heart, Star,
-  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube
+  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink
 } from "lucide-react";
-import type { Recipe, Review } from "@shared/schema";
+import type { Recipe, Review, AffiliateLink } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+
+function openWithDeepLink(deepLinkUrl: string, fallbackUrl: string) {
+  if (!deepLinkUrl) { window.open(fallbackUrl, "_blank", "noopener noreferrer"); return; }
+  let opened = false;
+  const onVisibilityChange = () => { if (document.hidden) { opened = true; } };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  const timer = setTimeout(() => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    if (!opened) window.open(fallbackUrl, "_blank", "noopener noreferrer");
+  }, 1500);
+  window.location.href = deepLinkUrl;
+  setTimeout(() => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    clearTimeout(timer);
+  }, 3000);
+}
+
+const SLOT_ICONS: Record<string, string> = {
+  amazon: "🛒",
+  blinkit: "⚡",
+  flipkart: "🏪",
+};
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -125,6 +147,12 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
       toast({ title: "Failed to post review", variant: "destructive" });
     },
   });
+
+  // Affiliate links
+  const { data: affiliateLinks = [] } = useQuery<AffiliateLink[]>({
+    queryKey: ["/api/affiliate-links"],
+  });
+  const activeLinks = affiliateLinks.filter((l) => l.isActive);
 
   // Image upload
   const uploadMutation = useMutation({
@@ -274,6 +302,36 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                 <Youtube className="w-4 h-4 flex-shrink-0" />
                 <span>Watch recipe video on YouTube</span>
               </a>
+            )}
+
+            {/* Get Ingredients Fast */}
+            {activeLinks.length > 0 && (
+              <div
+                data-testid="section-get-ingredients"
+                className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300">Get Ingredients Fast</h3>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {activeLinks.map((link) => (
+                    <button
+                      key={link.slot}
+                      data-testid={`button-affiliate-${link.slot}`}
+                      onClick={() => openWithDeepLink(link.deepLinkUrl, link.webUrl)}
+                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg bg-white dark:bg-neutral-900 border border-amber-200 dark:border-amber-700 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-left transition-all group shadow-sm"
+                    >
+                      <span className="text-lg">{SLOT_ICONS[link.slot] ?? "🛍️"}</span>
+                      <span className="flex-1 text-sm font-medium text-foreground">{link.buttonText}</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground group-hover:text-amber-600 transition-colors flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground italic leading-relaxed">
+                  As an affiliate partner, we may earn a commission from qualifying purchases.
+                </p>
+              </div>
             )}
 
             {/* Stats + Servings Scaler */}
