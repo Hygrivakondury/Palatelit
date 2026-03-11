@@ -8,7 +8,7 @@ import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
 
 export interface IStorage {
-  getRecipes(search?: string, cuisine?: string): Promise<Recipe[]>;
+  getRecipes(search?: string, cuisine?: string, category?: string): Promise<Recipe[]>;
   getUserRecipes(userId: string): Promise<Recipe[]>;
   getCommunityRecipes(): Promise<Recipe[]>;
   getRecipe(id: number): Promise<Recipe | undefined>;
@@ -56,8 +56,12 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getRecipes(search?: string, cuisine?: string): Promise<Recipe[]> {
+  async getRecipes(search?: string, cuisine?: string, category?: string): Promise<Recipe[]> {
     const conditions = [];
+
+    if (category) {
+      conditions.push(eq(recipes.category, category));
+    }
 
     if (cuisine) {
       conditions.push(eq(recipes.cuisineType, cuisine));

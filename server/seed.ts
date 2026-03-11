@@ -1,4 +1,6 @@
 import { storage } from "./storage";
+import { dessertSeedData } from "./seed-desserts";
+import { mocktailSeedData } from "./seed-mocktails";
 
 function yt(title: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " recipe indian vegetarian")}`;
@@ -2556,9 +2558,15 @@ export async function seedRecipes() {
       console.log(`[seed] Image URLs patched.`);
     }
 
-    // ── SEED: insert any missing recipes ─────────────────────────────
+    // ── SEED: all recipe data (main + dessert + mocktail) ───────────
+    const allSeedData = [
+      ...seedData.map((r) => ({ ...r, category: "main" as const })),
+      ...dessertSeedData,
+      ...mocktailSeedData,
+    ];
+
     const existingTitles = new Set(allExisting.map((r) => r.title));
-    const toSeed = seedData.filter((r) => !existingTitles.has(r.title));
+    const toSeed = allSeedData.filter((r) => !existingTitles.has(r.title));
 
     if (toSeed.length === 0) {
       console.log(`[seed] All ${allExisting.length} recipes already present.`);

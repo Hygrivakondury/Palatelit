@@ -136,7 +136,8 @@ export async function registerRoutes(
     try {
       const search = req.query.search as string | undefined;
       const cuisine = req.query.cuisine as string | undefined;
-      const recipeList = await storage.getRecipes(search, cuisine);
+      const category = req.query.category as string | undefined;
+      const recipeList = await storage.getRecipes(search, cuisine, category);
       res.json(recipeList);
     } catch (err) {
       console.error("Error fetching recipes:", err);

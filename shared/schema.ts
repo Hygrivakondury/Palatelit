@@ -6,6 +6,9 @@ import { relations } from "drizzle-orm";
 export * from "./models/auth";
 export * from "./models/chat";
 
+export const RECIPE_CATEGORIES = ["main", "dessert", "mocktail"] as const;
+export type RecipeCategory = typeof RECIPE_CATEGORIES[number];
+
 export const recipes = pgTable("recipes", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title: text("title").notNull(),
@@ -17,6 +20,7 @@ export const recipes = pgTable("recipes", {
   servings: integer("servings").notNull().default(4),
   cuisineType: varchar("cuisine_type", { length: 50 }).notNull(),
   dietaryTags: text("dietary_tags").array().notNull().default([]),
+  category: varchar("category", { length: 20 }).notNull().default("main"),
   imageUrl: text("image_url"),
   youtubeUrl: text("youtube_url"),
   authorId: varchar("author_id"),

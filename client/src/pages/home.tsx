@@ -15,13 +15,15 @@ import { PantryGenieTab } from "@/components/pantry-genie-tab";
 import { MealPlanTab } from "@/components/meal-plan-tab";
 import {
   Search, Leaf, ChefHat, X, LogOut, Heart, Sparkles,
-  SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays
+  SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
+  Candy, GlassWater
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import { CUISINE_TYPES } from "@shared/schema";
 
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
 type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan";
+type RecipeSubTab = "main" | "dessert" | "mocktail";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={16} /> },
@@ -31,10 +33,38 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "mealplan", label: "Meal Plan", icon: <CalendarDays size={16} /> },
 ];
 
+const RECIPE_SUB_TABS: { id: RecipeSubTab; label: string; icon: React.ReactNode; placeholder: string; emptyLabel: string; tagline: string }[] = [
+  {
+    id: "main",
+    label: "Dishes",
+    icon: <UtensilsCrossed size={15} />,
+    placeholder: "Type ingredients (e.g. paneer, spinach…)",
+    emptyLabel: "No Dishes Found",
+    tagline: "Explore India's finest vegetarian cooking",
+  },
+  {
+    id: "dessert",
+    label: "Desserts & Sweets",
+    icon: <Candy size={15} />,
+    placeholder: "Search sweets (e.g. jalebi, barfi, rasgulla…)",
+    emptyLabel: "No Sweets Found",
+    tagline: "India's most beloved mithai, halwas and festive sweets",
+  },
+  {
+    id: "mocktail",
+    label: "Mocktails & Juices",
+    icon: <GlassWater size={15} />,
+    placeholder: "Search drinks (e.g. lassi, thandai, aam panna…)",
+    emptyLabel: "No Drinks Found",
+    tagline: "Refreshing Indian drinks, sharbats and mocktails",
+  },
+];
+
 export default function HomePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>("recipes");
+  const [recipeSubTab, setRecipeSubTab] = useState<RecipeSubTab>("main");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState<string>("All");
@@ -43,6 +73,7 @@ export default function HomePage() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const currentUserId: string = (user as any)?.id ?? (user as any)?.claims?.sub ?? "";
+  const activeSubTabMeta = RECIPE_SUB_TABS.find((s) => s.id === recipeSubTab)!;
 
   const { data: myProfile } = useQuery<UserProfile | null>({
     queryKey: ["/api/my-profile"],
@@ -55,11 +86,12 @@ export default function HomePage() {
   });
 
   const { data: recipes = [], isLoading: recipesLoading } = useQuery<Recipe[]>({
-    queryKey: ["/api/recipes", { search: activeSearch, cuisine: selectedCuisine === "All" ? "" : selectedCuisine }],
+    queryKey: ["/api/recipes", { search: activeSearch, cuisine: selectedCuisine === "All" ? "" : selectedCuisine, category: recipeSubTab }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (activeSearch) params.set("search", activeSearch);
       if (selectedCuisine !== "All") params.set("cuisine", selectedCuisine);
+      params.set("category", recipeSubTab);
       const res = await fetch(`/api/recipes?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch recipes");
       return res.json();
@@ -87,6 +119,16 @@ export default function HomePage() {
   const handleSearch = () => setActiveSearch(searchQuery);
   const handleClearSearch = () => { setSearchQuery(""); setActiveSearch(""); };
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter") handleSearch(); };
+
+  const handleSubTabChange = (subTab: RecipeSubTab) => {
+    setRecipeSubTab(subTab);
+    setSearchQuery("");
+    setActiveSearch("");
+    setSelectedCuisine("All");
+    setSelectedDietary("All");
+    setShowFavoritesOnly(false);
+  };
+
   const cuisineOptions = ["All", ...CUISINE_TYPES];
   const isFiltering = activeSearch || selectedCuisine !== "All" || selectedDietary !== "All" || showFavoritesOnly;
 
@@ -112,7 +154,7 @@ export default function HomePage() {
                 <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-primary" />
                 <Input
                   type="search"
-                  placeholder="Type ingredients (e.g. paneer, spinach…)"
+                  placeholder={activeSubTabMeta.placeholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -232,13 +274,36 @@ export default function HomePage() {
       {/* Tab Content */}
       {activeTab === "recipes" && (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+          {/* Recipe Sub-Tabs */}
+          <div className="flex gap-1 mb-6 bg-muted/40 rounded-xl p-1 w-fit">
+            {RECIPE_SUB_TABS.map((sub) => (
+              <button
+                key={sub.id}
+                data-testid={`recipe-subtab-${sub.id}`}
+                onClick={() => handleSubTabChange(sub.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  recipeSubTab === sub.id
+                    ? "bg-background shadow-sm text-primary border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {sub.icon}
+                <span className="hidden sm:inline">{sub.label}</span>
+                <span className="sm:hidden">
+                  {sub.id === "main" ? "Dishes" : sub.id === "dessert" ? "Desserts" : "Drinks"}
+                </span>
+              </button>
+            ))}
+          </div>
+
           <div className="mb-6 space-y-1">
             <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-              {showFavoritesOnly ? "My Favourites" : activeSearch ? `Results for "${activeSearch}"` : "Discover Recipes"}
+              {showFavoritesOnly ? "My Favourites" : activeSearch ? `Results for "${activeSearch}"` : activeSubTabMeta.label}
             </h1>
             <p className="text-muted-foreground text-sm">
               {filteredRecipes.length} recipe{filteredRecipes.length !== 1 ? "s" : ""}
-              {showFavoritesOnly ? " saved" : activeSearch ? " found" : " — Explore India's finest vegetarian cooking"}
+              {showFavoritesOnly ? " saved" : activeSearch ? " found" : ` — ${activeSubTabMeta.tagline}`}
             </p>
           </div>
 
@@ -309,7 +374,7 @@ export default function HomePage() {
             <div className="mb-5 flex items-center gap-3 p-3 bg-accent/50 border border-accent-border rounded-xl">
               <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
               <p className="text-sm text-accent-foreground flex-1 truncate">
-                {activeSearch && <><span className="font-semibold">Ingredients:</span> "{activeSearch}" · </>}
+                {activeSearch && <><span className="font-semibold">Search:</span> "{activeSearch}" · </>}
                 {selectedCuisine !== "All" && <><span className="font-semibold">Cuisine:</span> {selectedCuisine} · </>}
                 {selectedDietary !== "All" && <><span className="font-semibold">Dietary:</span> {selectedDietary} · </>}
                 {showFavoritesOnly && <span className="font-semibold">❤️ Favourites only</span>}
@@ -343,13 +408,13 @@ export default function HomePage() {
                 {showFavoritesOnly ? <Heart className="w-8 h-8 text-muted-foreground" /> : <ChefHat className="w-8 h-8 text-muted-foreground" />}
               </div>
               <h3 className="font-serif text-xl font-bold text-foreground">
-                {showFavoritesOnly ? "No Favourites Yet" : "No Recipes Found"}
+                {showFavoritesOnly ? "No Favourites Yet" : activeSubTabMeta.emptyLabel}
               </h3>
               <p className="text-muted-foreground max-w-sm mx-auto text-sm">
                 {showFavoritesOnly
                   ? "Save recipes you love by clicking the heart icon in any recipe."
                   : activeSearch
-                  ? `We couldn't find recipes with "${activeSearch}". Try different ingredients.`
+                  ? `We couldn't find ${recipeSubTab === "main" ? "dishes" : recipeSubTab === "dessert" ? "sweets" : "drinks"} with "${activeSearch}". Try different terms.`
                   : "No recipes match your filters. Try adjusting them."}
               </p>
               <Button
