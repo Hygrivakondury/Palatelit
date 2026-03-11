@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Camera, Plus, Trash2, Loader2, Sparkles, X,
   ShoppingBag, ChefHat, AlertCircle, Check, Image,
-  Lightbulb, RefreshCw
+  Lightbulb, RefreshCw, RotateCcw,
 } from "lucide-react";
 import type { PantryItem, Recipe } from "@shared/schema";
 
@@ -25,7 +25,9 @@ interface PantryGenieTabProps {
 export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const [newItem, setNewItem] = useState("");
   const [identified, setIdentified] = useState<string[]>([]);
   const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
@@ -33,6 +35,101 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const [hasSuggested, setHasSuggested] = useState(false);
   const [generatingImageFor, setGeneratingImageFor] = useState<number | null>(null);
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+
+  // Camera modal state
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+
+  // Attach stream to video element whenever stream or modal opens
+  useEffect(() => {
+    if (showCamera && videoRef.current && cameraStream && !capturedDataUrl) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [showCamera, cameraStream, capturedDataUrl]);
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      cameraStream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [cameraStream]);
+
+  const startCamera = useCallback(async (facing: "environment" | "user" = "environment") => {
+    setCameraError(null);
+    setCapturedDataUrl(null);
+    // Stop existing stream
+    cameraStream?.getTracks().forEach((t) => t.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing } },
+        audio: false,
+      });
+      setCameraStream(stream);
+      setFacingMode(facing);
+      setShowCamera(true);
+    } catch (err: any) {
+      setCameraError(
+        err?.name === "NotAllowedError"
+          ? "Camera permission was denied. Please allow camera access in your browser settings."
+          : "Could not access camera. Your device may not have one, or another app is using it."
+      );
+      setShowCamera(true); // Show modal with error
+    }
+  }, [cameraStream]);
+
+  const flipCamera = useCallback(() => {
+    const next = facingMode === "environment" ? "user" : "environment";
+    startCamera(next);
+  }, [facingMode, startCamera]);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    setCapturedDataUrl(canvas.toDataURL("image/jpeg", 0.92));
+    // Pause the stream (not stop — so user can retake)
+    video.pause();
+  }, []);
+
+  const retakePhoto = useCallback(() => {
+    setCapturedDataUrl(null);
+    if (videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play();
+    }
+  }, [cameraStream]);
+
+  const useCapturedPhoto = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
+          analyzePhotoMutation.mutate(file);
+        }
+        closeCamera();
+      },
+      "image/jpeg",
+      0.92,
+    );
+  }, []);
+
+  const closeCamera = useCallback(() => {
+    cameraStream?.getTracks().forEach((t) => t.stop());
+    setCameraStream(null);
+    setShowCamera(false);
+    setCapturedDataUrl(null);
+    setCameraError(null);
+  }, [cameraStream]);
 
   const { data: pantry = [], isLoading: pantryLoading } = useQuery<PantryItem[]>({
     queryKey: ["/api/pantry"],
@@ -59,10 +156,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
 
   const removeItemMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/pantry/items/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(`/api/pantry/items/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to remove item");
     },
     onSuccess: () => {
@@ -74,10 +168,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
 
   const clearPantryMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/pantry", {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch("/api/pantry", { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to clear pantry");
     },
     onSuccess: () => {
@@ -96,12 +187,16 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
         credentials: "include",
         body: formData,
       });
-      if (!res.ok) throw new Error("Failed to analyze photo");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message ?? "Failed to analyze photo");
+      }
       return res.json() as Promise<{ ingredients: string[] }>;
     },
     onSuccess: (data) => {
-      setIdentified(data.ingredients);
-      setSelectedToAdd(new Set(data.ingredients));
+      const ingredients = data.ingredients ?? [];
+      setIdentified(ingredients);
+      setSelectedToAdd(new Set(ingredients));
     },
   });
 
@@ -121,7 +216,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
     },
   });
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) analyzePhotoMutation.mutate(file);
     e.target.value = "";
@@ -149,9 +244,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
       if (!res.ok) throw new Error("Failed to generate image");
       const data = await res.json();
       const preview = data.imageUrl ?? (data.b64_json ? `data:${data.mimeType};base64,${data.b64_json}` : null);
-      if (preview) {
-        setGeneratedImages((prev) => ({ ...prev, [recipe.id]: preview }));
-      }
+      if (preview) setGeneratedImages((prev) => ({ ...prev, [recipe.id]: preview }));
       qc.invalidateQueries({ queryKey: ["/api/recipes"] });
     } catch (err) {
       console.error("Image generation failed:", err);
@@ -168,6 +261,105 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-black/80">
+            <span className="text-white font-semibold text-sm">
+              {capturedDataUrl ? "Use this photo?" : "Take a Photo"}
+            </span>
+            <button onClick={closeCamera} className="text-white p-1">
+              <X size={22} />
+            </button>
+          </div>
+
+          {/* Camera error */}
+          {cameraError && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
+              <AlertCircle size={48} className="text-red-400" />
+              <p className="text-white text-center text-sm">{cameraError}</p>
+              <Button
+                variant="outline"
+                onClick={closeCamera}
+                className="border-white text-white hover:bg-white/10"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
+          {/* Live viewfinder */}
+          {!cameraError && !capturedDataUrl && (
+            <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              {/* Flip camera button */}
+              <button
+                onClick={flipCamera}
+                className="absolute top-4 right-4 bg-black/50 text-white rounded-full p-2.5"
+                title="Flip camera"
+              >
+                <RotateCcw size={18} />
+              </button>
+            </div>
+          )}
+
+          {/* Captured preview */}
+          {!cameraError && capturedDataUrl && (
+            <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
+              <img src={capturedDataUrl} alt="Captured" className="w-full h-full object-contain" />
+            </div>
+          )}
+
+          {/* Bottom controls */}
+          {!cameraError && (
+            <div className="flex items-center justify-center gap-6 px-6 py-6 bg-black/80">
+              {capturedDataUrl ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={retakePhoto}
+                    className="border-white text-white hover:bg-white/10 flex-1 max-w-[140px]"
+                  >
+                    <RotateCcw size={15} className="mr-1.5" />
+                    Retake
+                  </Button>
+                  <Button
+                    onClick={useCapturedPhoto}
+                    disabled={analyzePhotoMutation.isPending}
+                    className="bg-primary hover:bg-primary/90 flex-1 max-w-[140px]"
+                  >
+                    {analyzePhotoMutation.isPending ? (
+                      <Loader2 size={15} className="animate-spin mr-1.5" />
+                    ) : (
+                      <Sparkles size={15} className="mr-1.5" />
+                    )}
+                    Analyse
+                  </Button>
+                </>
+              ) : (
+                <button
+                  onClick={capturePhoto}
+                  className="w-16 h-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center"
+                  title="Capture photo"
+                >
+                  <div className="w-12 h-12 rounded-full bg-white" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Hidden canvas for capture */}
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      )}
+
       <div>
         <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-100 flex items-center gap-2">
           <ShoppingBag size={24} className="text-primary" />
@@ -234,6 +426,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
           </div>
         )}
 
+        {/* Input row */}
         <div className="flex gap-2 pt-1">
           <Input
             data-testid="input-pantry-item"
@@ -252,6 +445,8 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
           >
             <Plus size={14} />
           </Button>
+
+          {/* Gallery button — file picker only, no camera */}
           <Button
             data-testid="button-scan-gallery"
             size="sm"
@@ -268,40 +463,33 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
             )}
             <span className="ml-1 hidden sm:inline">Gallery</span>
           </Button>
+
+          {/* Camera button — uses getUserMedia */}
           <Button
             data-testid="button-scan-camera"
             size="sm"
             variant="outline"
-            onClick={() => cameraRef.current?.click()}
+            onClick={() => startCamera("environment")}
             disabled={analyzePhotoMutation.isPending}
             className="h-9 border-primary text-primary hover:bg-primary/5"
             title="Take a photo with your camera"
           >
-            {analyzePhotoMutation.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Camera size={14} />
-            )}
+            <Camera size={14} />
             <span className="ml-1 hidden sm:inline">Camera</span>
           </Button>
+
+          {/* Hidden file input for gallery — no capture attribute */}
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handlePhotoChange}
-          />
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handlePhotoChange}
+            onChange={handleGalleryChange}
           />
         </div>
       </div>
 
+      {/* Analyzing indicator */}
       {analyzePhotoMutation.isPending && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center gap-3 text-blue-700 dark:text-blue-300">
           <Loader2 size={18} className="animate-spin flex-shrink-0" />
@@ -309,12 +497,43 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
         </div>
       )}
 
-      {identified.length > 0 && (
-        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-blue-200 dark:border-blue-700 p-5 shadow-sm space-y-3">
-          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-            <Sparkles size={16} />
-            <h3 className="font-semibold text-sm">Gemini identified these ingredients</h3>
+      {/* Analysis error */}
+      {analyzePhotoMutation.isError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 text-red-700 dark:text-red-300">
+          <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold">Photo analysis failed</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              {(analyzePhotoMutation.error as Error)?.message ?? "Please try again with a clearer photo."}
+            </p>
+            <button
+              className="text-xs underline mt-1 opacity-70 hover:opacity-100"
+              onClick={() => analyzePhotoMutation.reset()}
+            >
+              Dismiss
+            </button>
           </div>
+        </div>
+      )}
+
+      {/* Identified ingredients from photo */}
+      {identified.length > 0 && !analyzePhotoMutation.isPending && (
+        <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-blue-200 dark:border-blue-700 p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <Sparkles size={16} />
+              <h3 className="font-semibold text-sm">
+                Gemini found {identified.length} ingredient{identified.length !== 1 ? "s" : ""}
+              </h3>
+            </div>
+            <button
+              onClick={() => { setIdentified([]); setSelectedToAdd(new Set()); }}
+              className="text-neutral-400 hover:text-neutral-600"
+            >
+              <X size={15} />
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500">Tap to deselect any you don't want to add.</p>
           <div className="flex flex-wrap gap-2">
             {identified.map((ing) => (
               <button
@@ -330,7 +549,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-all ${
                   selectedToAdd.has(ing)
                     ? "bg-primary text-white border-primary"
-                    : "bg-neutral-50 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-600"
+                    : "bg-neutral-50 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-600 line-through opacity-50"
                 }`}
               >
                 {selectedToAdd.has(ing) && <Check size={11} />}
@@ -346,7 +565,11 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
               disabled={selectedToAdd.size === 0 || addItemsMutation.isPending}
               className="bg-primary hover:bg-primary/90"
             >
-              {addItemsMutation.isPending ? <Loader2 size={13} className="animate-spin mr-1" /> : <Plus size={13} className="mr-1" />}
+              {addItemsMutation.isPending ? (
+                <Loader2 size={13} className="animate-spin mr-1" />
+              ) : (
+                <Plus size={13} className="mr-1" />
+              )}
               Add {selectedToAdd.size > 0 ? `${selectedToAdd.size} ` : ""}selected to Pantry
             </Button>
             <Button
@@ -354,12 +577,26 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
               variant="ghost"
               onClick={() => { setIdentified([]); setSelectedToAdd(new Set()); }}
             >
-              Dismiss
+              Dismiss all
             </Button>
           </div>
         </div>
       )}
 
+      {/* No ingredients found from photo */}
+      {identified.length === 0 && analyzePhotoMutation.isSuccess && !analyzePhotoMutation.isPending && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3 text-amber-700 dark:text-amber-300">
+          <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold">No ingredients detected</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              Try a clearer, well-lit photo of your vegetables, fruits, or pantry items.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Find recipes button */}
       {pantry.length > 0 && (
         <Button
           data-testid="button-find-recipes"
@@ -381,6 +618,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
         </Button>
       )}
 
+      {/* Recipe suggestions */}
       {hasSuggested && (
         <div className="space-y-4">
           <h3 className="font-semibold text-neutral-800 dark:text-neutral-100 text-lg flex items-center gap-2">
@@ -404,11 +642,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
                 className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden shadow-sm"
               >
                 {generatedImages[recipe.id] ? (
-                  <img
-                    src={generatedImages[recipe.id]}
-                    alt={recipe.title}
-                    className="w-full h-48 object-cover"
-                  />
+                  <img src={generatedImages[recipe.id]} alt={recipe.title} className="w-full h-48 object-cover" />
                 ) : (
                   <div className="w-full h-32 bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 flex items-center justify-center">
                     <ChefHat size={40} className="text-amber-300 dark:text-amber-600" />
@@ -437,12 +671,8 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
                       <div className="flex items-start gap-2">
                         <AlertCircle size={13} className="text-orange-500 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 mb-1">
-                            Missing main ingredients
-                          </p>
-                          <p className="text-xs text-orange-600 dark:text-orange-400">
-                            {missingMain.join(", ")}
-                          </p>
+                          <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 mb-1">Missing main ingredients</p>
+                          <p className="text-xs text-orange-600 dark:text-orange-400">{missingMain.join(", ")}</p>
                         </div>
                       </div>
                     </div>
@@ -453,12 +683,8 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
                       <div className="flex items-start gap-2">
                         <Lightbulb size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">
-                            Add these to elevate the dish
-                          </p>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            {missingSpices.join(", ")}
-                          </p>
+                          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">Add these to elevate the dish</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">{missingSpices.join(", ")}</p>
                         </div>
                       </div>
                     </div>
