@@ -31,7 +31,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={16} /> },
   { id: "community", label: "Community", icon: <Users size={16} /> },
   { id: "challenge", label: "Weekly Challenge", icon: <Trophy size={16} /> },
-  { id: "pantry", label: "Pantry Recipe", icon: <ShoppingBag size={16} /> },
+  { id: "pantry", label: "Pantry", icon: <ShoppingBag size={16} /> },
   { id: "mealplan", label: "Meal Plan", icon: <CalendarDays size={16} /> },
 ];
 
