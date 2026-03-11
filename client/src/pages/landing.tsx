@@ -110,7 +110,7 @@ export default function LandingPage() {
             <div className="absolute -top-4 -right-4 bg-accent border border-accent-border rounded-xl px-4 py-2 shadow-lg">
               <div className="flex items-center gap-2">
                 <Star className="w-3.5 h-3.5 text-accent-foreground fill-accent-foreground" />
-                <span className="text-xs font-semibold text-accent-foreground">500+ Recipes</span>
+                <span className="text-xs font-semibold text-accent-foreground">100s of Recipes</span>
               </div>
             </div>
             <div className="absolute -bottom-4 -left-4 bg-primary rounded-xl px-4 py-2 shadow-lg">
