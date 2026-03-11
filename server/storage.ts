@@ -2,7 +2,7 @@ import {
   recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
-  type PantryItem, type MealPlan,
+  type PantryItem, type MealPlan, type MealType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
@@ -45,10 +45,11 @@ export interface IStorage {
   getMealPlansByEmail(userEmail: string): Promise<MealPlan[]>;
   getMealPlan(userEmail: string, day: string): Promise<MealPlan | undefined>;
   upsertMealPlan(userEmail: string, day: string, recipeIds: number[]): Promise<MealPlan>;
-  addRecipeToMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
-  removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan>;
+  addRecipeToMealPlan(userEmail: string, day: string, recipeId: number, mealType?: MealType): Promise<MealPlan>;
+  removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number, mealType?: MealType): Promise<MealPlan>;
   clearMealPlanDay(userEmail: string, day: string): Promise<void>;
   clearWeekPlan(userEmail: string): Promise<void>;
+  smartfillMealPlan(userEmail: string, dayPlans: Array<{ day: string; breakfast: number[]; lunch: number[]; dinner: number[]; snacks: number[] }>): Promise<MealPlan[]>;
   // Shopping Checked
   getShoppingChecked(userEmail: string): Promise<string[]>;
   toggleShoppingItem(userEmail: string, key: string): Promise<string[]>;
@@ -269,17 +270,41 @@ export class DatabaseStorage implements IStorage {
     return plan;
   }
 
-  async addRecipeToMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan> {
+  async addRecipeToMealPlan(userEmail: string, day: string, recipeId: number, mealType: MealType = "dinner"): Promise<MealPlan> {
     const existing = await this.getMealPlan(userEmail, day);
-    const current = existing?.recipeIds ?? [];
-    const updated = current.includes(recipeId) ? current : [...current, recipeId];
-    return this.upsertMealPlan(userEmail, day, updated);
+    const catCurrent = existing?.[mealType] ?? [];
+    const catUpdated = catCurrent.includes(recipeId) ? catCurrent : [...catCurrent, recipeId];
+    const breakfast = mealType === "breakfast" ? catUpdated : (existing?.breakfast ?? []);
+    const lunch = mealType === "lunch" ? catUpdated : (existing?.lunch ?? []);
+    const dinner = mealType === "dinner" ? catUpdated : (existing?.dinner ?? []);
+    const snacks = mealType === "snacks" ? catUpdated : (existing?.snacks ?? []);
+    const recipeIds = [...new Set([...breakfast, ...lunch, ...dinner, ...snacks])];
+    const [plan] = await db.insert(mealPlans)
+      .values({ userEmail, day, breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [mealPlans.userEmail, mealPlans.day],
+        set: { breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() },
+      })
+      .returning();
+    return plan;
   }
 
-  async removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number): Promise<MealPlan> {
+  async removeRecipeFromMealPlan(userEmail: string, day: string, recipeId: number, mealType?: MealType): Promise<MealPlan> {
     const existing = await this.getMealPlan(userEmail, day);
-    const updated = (existing?.recipeIds ?? []).filter((id) => id !== recipeId);
-    return this.upsertMealPlan(userEmail, day, updated);
+    const filter = (arr: number[]) => arr.filter((id) => id !== recipeId);
+    const breakfast = mealType === "breakfast" || !mealType ? filter(existing?.breakfast ?? []) : (existing?.breakfast ?? []);
+    const lunch = mealType === "lunch" || !mealType ? filter(existing?.lunch ?? []) : (existing?.lunch ?? []);
+    const dinner = mealType === "dinner" || !mealType ? filter(existing?.dinner ?? []) : (existing?.dinner ?? []);
+    const snacks = mealType === "snacks" || !mealType ? filter(existing?.snacks ?? []) : (existing?.snacks ?? []);
+    const recipeIds = [...new Set([...breakfast, ...lunch, ...dinner, ...snacks])];
+    const [plan] = await db.insert(mealPlans)
+      .values({ userEmail, day, breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [mealPlans.userEmail, mealPlans.day],
+        set: { breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() },
+      })
+      .returning();
+    return plan;
   }
 
   async clearMealPlanDay(userEmail: string, day: string): Promise<void> {
@@ -289,6 +314,19 @@ export class DatabaseStorage implements IStorage {
 
   async clearWeekPlan(userEmail: string): Promise<void> {
     await db.delete(mealPlans).where(eq(mealPlans.userEmail, userEmail));
+  }
+
+  async smartfillMealPlan(userEmail: string, dayPlans: Array<{ day: string; breakfast: number[]; lunch: number[]; dinner: number[]; snacks: number[] }>): Promise<MealPlan[]> {
+    for (const { day, breakfast, lunch, dinner, snacks } of dayPlans) {
+      const recipeIds = [...new Set([...breakfast, ...lunch, ...dinner, ...snacks])];
+      await db.insert(mealPlans)
+        .values({ userEmail, day, breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: [mealPlans.userEmail, mealPlans.day],
+          set: { breakfast, lunch, dinner, snacks, recipeIds, updatedAt: new Date() },
+        });
+    }
+    return this.getMealPlansByEmail(userEmail);
   }
 
   async getShoppingChecked(userEmail: string): Promise<string[]> {

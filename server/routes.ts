@@ -557,10 +557,10 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     try {
       const email = req.user.claims.email;
       const { day } = req.params;
-      const { recipeId } = req.body;
+      const { recipeId, mealType } = req.body;
       if (!email) return res.status(400).json({ message: "User email not available" });
       if (typeof recipeId !== "number") return res.status(400).json({ message: "recipeId must be a number" });
-      const plan = await storage.addRecipeToMealPlan(email, day, recipeId);
+      const plan = await storage.addRecipeToMealPlan(email, day, recipeId, mealType ?? "dinner");
       res.json(plan);
     } catch (err) {
       res.status(500).json({ message: "Failed to add recipe to meal plan" });
@@ -571,8 +571,9 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     try {
       const email = req.user.claims.email;
       const { day, recipeId } = req.params;
+      const mealType = req.query.mealType as string | undefined;
       if (!email) return res.status(400).json({ message: "User email not available" });
-      const plan = await storage.removeRecipeFromMealPlan(email, day, parseInt(recipeId));
+      const plan = await storage.removeRecipeFromMealPlan(email, day, parseInt(recipeId), mealType as any);
       res.json(plan);
     } catch (err) {
       res.status(500).json({ message: "Failed to remove recipe from meal plan" });
@@ -598,18 +599,20 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
       if (!email) return res.status(400).json({ message: "User email not available" });
       const allRecipes = await storage.getRecipes();
       if (allRecipes.length === 0) return res.status(400).json({ message: "No recipes available" });
+
       const shuffled = [...allRecipes].sort(() => Math.random() - 0.5);
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-      const mealsPerDay = 2;
-      const totalSlots = days.length * mealsPerDay;
-      const slots: number[] = [];
-      for (let i = 0; i < totalSlots; i++) {
-        slots.push(shuffled[i % shuffled.length].id);
-      }
-      for (let i = 0; i < days.length; i++) {
-        await storage.upsertMealPlan(email, days[i], [slots[i * 2], slots[i * 2 + 1]]);
-      }
-      const plans = await storage.getMealPlansByEmail(email);
+      const pick = (offset: number) => shuffled[offset % shuffled.length].id;
+
+      const dayPlans = days.map((day, i) => ({
+        day,
+        breakfast: [pick(i * 4)],
+        lunch: [pick(i * 4 + 1)],
+        dinner: [pick(i * 4 + 2)],
+        snacks: [pick(i * 4 + 3)],
+      }));
+
+      const plans = await storage.smartfillMealPlan(email, dayPlans);
       res.json(plans);
     } catch (err) {
       res.status(500).json({ message: "Failed to smartfill meal plan" });

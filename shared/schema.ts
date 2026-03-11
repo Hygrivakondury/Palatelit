@@ -155,11 +155,32 @@ export const DAYS_OF_WEEK = [
 ] as const;
 export type DayOfWeek = typeof DAYS_OF_WEEK[number];
 
+export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snacks"] as const;
+export type MealType = typeof MEAL_TYPES[number];
+
+export const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snacks: "Snacks",
+};
+
+export const MEAL_TYPE_EMOJIS: Record<MealType, string> = {
+  breakfast: "🌅",
+  lunch: "☀️",
+  dinner: "🌙",
+  snacks: "🍽️",
+};
+
 export const mealPlans = pgTable("meal_plans", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userEmail: varchar("user_email").notNull(),
   day: varchar("day", { length: 20 }).notNull(),
   recipeIds: integer("recipe_ids").array().notNull().default([]),
+  breakfast: integer("breakfast").array().notNull().default([]),
+  lunch: integer("lunch").array().notNull().default([]),
+  dinner: integer("dinner").array().notNull().default([]),
+  snacks: integer("snacks").array().notNull().default([]),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   userEmailDayUnique: unique().on(table.userEmail, table.day),
