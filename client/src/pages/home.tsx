@@ -15,11 +15,12 @@ import { WeeklyChallengeTab } from "@/components/weekly-challenge-tab";
 import { PantryGenieTab } from "@/components/pantry-genie-tab";
 import { MealPlanTab } from "@/components/meal-plan-tab";
 import {
-  Search, Leaf, ChefHat, X, LogOut, Heart, Sparkles,
+  Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
   Candy, GlassWater
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
+import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
 import { CUISINE_TYPES } from "@shared/schema";
 
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
@@ -178,9 +179,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Leaf className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
+            <img src={logoImg} alt="Palate Lit logo" className="w-7 h-7 rounded-lg object-cover" />
             <span className="font-serif text-lg font-bold text-foreground tracking-tight hidden sm:block">Palate Lit</span>
           </div>
 
