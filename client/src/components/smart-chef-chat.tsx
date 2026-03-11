@@ -175,7 +175,7 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
       <button
         data-testid="button-smart-chef-open"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-xl text-white font-semibold text-sm transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-24 sm:bottom-6 right-4 sm:right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-xl text-white font-semibold text-sm transition-all hover:scale-105 active:scale-95"
         style={{ background: "linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%)" }}
       >
         <ChefHat size={18} />
@@ -184,7 +184,7 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end p-4 sm:p-6 pointer-events-none">
+        <div className="fixed inset-0 z-50 flex items-end justify-end p-4 pb-24 sm:p-6 sm:pb-6 pointer-events-none">
           <div
             className="pointer-events-auto w-full max-w-sm bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl flex flex-col border border-neutral-200 dark:border-neutral-700 overflow-hidden"
             style={{ height: "min(560px, calc(100vh - 5rem))" }}
