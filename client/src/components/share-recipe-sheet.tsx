@@ -16,7 +16,7 @@ function buildShareUrl(recipeId: number): string {
 }
 
 function buildShareText(recipe: Recipe): string {
-  return `🍽️ ${recipe.title} — a delicious Indian vegetarian recipe on Flavour Genie!\n\n${recipe.description}\n\n⏱ ${recipe.prepTime + recipe.cookTime} min • ${recipe.cuisineType}`;
+  return `🍽️ ${recipe.title} — a delicious Indian vegetarian recipe on Palate Lit!\n\n${recipe.description}\n\n⏱ ${recipe.prepTime + recipe.cookTime} min • ${recipe.cuisineType}`;
 }
 
 const PLATFORMS = [

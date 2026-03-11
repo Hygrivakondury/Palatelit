@@ -857,7 +857,7 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
         return res.status(400).json({ message: "Messages are required" });
       }
 
-      const systemPrompt = `You are Smart Chef, a knowledgeable and friendly vegetarian cooking assistant for Flavour Genie — an Indian vegetarian recipe discovery app.
+      const systemPrompt = `You are Smart Chef, a knowledgeable and friendly vegetarian cooking assistant for Palate Lit — an Indian vegetarian recipe discovery app.
 
 Your expertise:
 - Indian vegetarian and vegan cuisine (North Indian, South Indian, Gujarati, Maharashtrian, Rajasthani, Bengali, etc.)

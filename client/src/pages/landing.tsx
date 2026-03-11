@@ -12,7 +12,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Leaf className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-serif text-xl font-bold text-foreground tracking-tight">Flavour Genie</span>
+            <span className="font-serif text-xl font-bold text-foreground tracking-tight">Palate Lit</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
@@ -40,7 +40,7 @@ export default function LandingPage() {
               <span className="block text-primary"> with What You Have</span>
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-              Tell Flavour Genie what ingredients are in your kitchen. It instantly finds authentic Indian vegetarian recipes crafted for your pantry.
+              Illuminating Flavor. Elevating Mood — Palate Lit finds authentic Indian vegetarian recipes perfectly matched to what's in your kitchen.
             </p>
             <div className="flex flex-wrap gap-4">
               <a href="/api/login">
@@ -202,7 +202,7 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: "Priya S.", location: "Bengaluru", quote: "I finally stopped wasting vegetables. Flavour Genie always has a recipe for whatever's in my fridge!", stars: 5 },
+              { name: "Priya S.", location: "Bengaluru", quote: "I finally stopped wasting vegetables. Palate Lit always has a recipe for whatever's in my fridge!", stars: 5 },
               { name: "Rahul M.", location: "Delhi", quote: "The Genie Filter is magic. I typed 'dal and some spices' and got 12 authentic recipes instantly.", stars: 5 },
               { name: "Meera K.", location: "Mumbai", quote: "As a Gujarati, I was skeptical. But the regional recipe accuracy is truly impressive.", stars: 5 },
             ].map((t, i) => (
@@ -237,7 +237,7 @@ export default function LandingPage() {
           <p className="text-muted-foreground text-lg">Join thousands of Indian home cooks who've transformed their kitchens.</p>
           <a href="/api/login">
             <Button size="lg" data-testid="button-cta-final" className="gap-2 px-10 h-14 text-base font-medium shadow-lg">
-              Join Flavour Genie — It's Free <ArrowRight className="w-4 h-4" />
+              Join Palate Lit — It's Free <ArrowRight className="w-4 h-4" />
             </Button>
           </a>
           <p className="text-sm text-muted-foreground">No credit card required • 100% free to use</p>
@@ -251,9 +251,9 @@ export default function LandingPage() {
             <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
               <Leaf className="w-3 h-3 text-primary-foreground" />
             </div>
-            <span className="font-serif font-bold text-foreground">Flavour Genie</span>
+            <span className="font-serif font-bold text-foreground">Palate Lit</span>
           </div>
-          <p className="text-sm text-muted-foreground">© 2026 Flavour Genie. Celebrating India's vegetarian heritage.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Palate Lit. Celebrating India's vegetarian heritage.</p>
         </div>
       </footer>
     </div>

@@ -181,7 +181,7 @@ export default function HomePage() {
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
               <Leaf className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            <span className="font-serif text-lg font-bold text-foreground tracking-tight hidden sm:block">Flavour Genie</span>
+            <span className="font-serif text-lg font-bold text-foreground tracking-tight hidden sm:block">Palate Lit</span>
           </div>
 
           {activeTab === "recipes" && (
@@ -216,7 +216,7 @@ export default function HomePage() {
 
           {(activeTab === "community" || activeTab === "challenge") && (
             <div className="flex-1 flex justify-center">
-              <span className="font-serif text-base font-bold text-foreground sm:hidden">Flavour Genie</span>
+              <span className="font-serif text-base font-bold text-foreground sm:hidden">Palate Lit</span>
             </div>
           )}
 

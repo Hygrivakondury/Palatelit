@@ -33,8 +33,8 @@ export async function sendContributionEmail(
   const html = `
     <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:40px 20px;">
       <div style="background:linear-gradient(135deg,#2d6a4f,#1b4332);padding:30px;border-radius:16px 16px 0 0;text-align:center;">
-        <h1 style="color:#d4af37;font-size:28px;margin:0;letter-spacing:1px;">Flavour Genie</h1>
-        <p style="color:#a7f3d0;font-size:13px;margin:6px 0 0;">Indian Vegetarian Recipe Discovery</p>
+        <h1 style="color:#d4af37;font-size:28px;margin:0;letter-spacing:1px;">Palate Lit</h1>
+        <p style="color:#a7f3d0;font-size:13px;margin:6px 0 0;">Illuminating Flavor. Elevating Mood.</p>
       </div>
       <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 16px 16px;border:1px solid #e5e7eb;border-top:none;">
         <p style="font-size:17px;color:#1b4332;font-weight:bold;margin-top:0;">
@@ -43,7 +43,7 @@ export async function sendContributionEmail(
         <p style="color:#374151;line-height:1.8;font-size:15px;">
           We're absolutely delighted to let you know that your recipe
           <strong style="color:#2d6a4f;">&ldquo;${recipeTitle}&rdquo;</strong>
-          has been published to the Flavour Genie community cookbook
+          has been published to the Palate Lit community cookbook
           through <strong>${sourceLabel}</strong>!
         </p>
         <p style="color:#374151;line-height:1.8;font-size:15px;">
@@ -56,12 +56,12 @@ export async function sendContributionEmail(
           </p>
         </div>
         <p style="color:#374151;line-height:1.8;font-size:15px;">
-          You can find your recipe in the <strong>Community</strong> tab on Flavour Genie,
+          You can find your recipe in the <strong>Community</strong> tab on Palate Lit,
           where fellow cooks can discover it, save it to their favourites, and even chat with you about it!
         </p>
         <p style="color:#6b7280;font-size:13px;margin-top:36px;padding-top:20px;border-top:1px solid #f3f4f6;">
           With warmth and appreciation,<br/>
-          <strong style="color:#2d6a4f;">The Flavour Genie Team</strong><br/>
+          <strong style="color:#2d6a4f;">The Palate Lit Team</strong><br/>
           <a href="mailto:genieflavour@gmail.com" style="color:#2d6a4f;text-decoration:none;">genieflavour@gmail.com</a>
         </p>
       </div>
@@ -70,9 +70,9 @@ export async function sendContributionEmail(
 
   try {
     await transporter.sendMail({
-      from: `"Flavour Genie" <${GMAIL_USER}>`,
+      from: `"Palate Lit" <${GMAIL_USER}>`,
       to: recipientEmail,
-      subject: `Your recipe "${recipeTitle}" is now live on Flavour Genie! 🍲`,
+      subject: `Your recipe "${recipeTitle}" is now live on Palate Lit! 🍲`,
       html,
     });
     console.log(`[Email] Sent contribution email → ${recipientEmail} ("${recipeTitle}")`);
