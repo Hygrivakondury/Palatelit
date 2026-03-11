@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import { Clock, Users, ChefHat, Heart } from "lucide-react";
 import type { Recipe } from "@shared/schema";
 
@@ -46,6 +47,7 @@ export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardP
   const totalTime = recipe.prepTime + recipe.cookTime;
   const badgeClass = cuisineColors[recipe.cuisineType] ?? "bg-muted text-muted-foreground border-border";
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div
@@ -55,10 +57,11 @@ export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardP
     >
       {/* Image / Placeholder */}
       <div className="relative w-full h-44 bg-gradient-to-br from-primary/10 via-primary/5 to-accent overflow-hidden flex-shrink-0">
-        {recipe.imageUrl ? (
+        {recipe.imageUrl && !imgError ? (
           <img
             src={recipe.imageUrl}
             alt={recipe.title}
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
