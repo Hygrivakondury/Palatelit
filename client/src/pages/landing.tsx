@@ -36,8 +36,8 @@ export default function LandingPage() {
               <span className="text-xs font-medium text-accent-foreground">100% Vegetarian • Made for India</span>
             </div>
             <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] tracking-tight">
-              Cook with what
-              <span className="block text-primary"> you have.</span>
+              Cook What You Love,
+              <span className="block text-primary"> with What You Have</span>
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
               Tell Flavour Genie what ingredients are in your kitchen. It instantly finds authentic Indian vegetarian recipes crafted for your pantry.
