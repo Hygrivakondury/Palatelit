@@ -445,21 +445,24 @@ export async function registerRoutes(
       const imageData = fs.readFileSync(req.file.path).toString("base64");
       const mimeType = req.file.mimetype as string;
 
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: [
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 500,
+        messages: [
           {
             role: "user",
-            parts: [
+            content: [
               {
-                inlineData: { mimeType, data: imageData },
+                type: "image_url",
+                image_url: { url: `data:${mimeType};base64,${imageData}` },
               },
               {
-                text: `You are a vegetable and ingredient identification expert.
-Look at this image carefully and identify ALL vegetables, fruits, legumes, grains, dairy products, and cooking ingredients visible.
+                type: "text",
+                text: `You are an expert at identifying food ingredients.
+Look at this photo carefully and list ALL visible vegetables, fruits, legumes, grains, dairy products, meats, and cooking ingredients.
 Return ONLY a valid JSON array of ingredient names in English, lowercase, singular form.
 Example: ["spinach", "potato", "tomato", "onion", "garlic", "paneer", "lentil"]
-Do NOT include non-food items, cooking utensils, or packaging text.
+Do NOT include cooking utensils, packaging, or non-food items.
 Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
               },
             ],
@@ -469,8 +472,8 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
 
       if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
-      const rawText = response.text ?? response.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-      console.log("[Pantry] Gemini raw response:", rawText?.slice(0, 200));
+      const rawText = response.choices?.[0]?.message?.content ?? "[]";
+      console.log("[Pantry] OpenAI vision response:", rawText?.slice(0, 200));
       let ingredients: string[] = [];
       try {
         const cleaned = rawText.replace(/```json|```/g, "").trim();
