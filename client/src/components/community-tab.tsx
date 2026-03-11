@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,8 @@ interface CommunityTabProps {
 export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabProps) {
   const [chatRecipe, setChatRecipe] = useState<Recipe | null>(null);
   const [viewRecipe, setViewRecipe] = useState<Recipe | null>(null);
+  const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
+  const onImgError = useCallback((id: number) => setImgErrors(prev => new Set([...prev, id])), []);
 
   const { data: recipes = [], isLoading } = useQuery<Recipe[]>({
     queryKey: ["/api/recipes/community"],
@@ -24,6 +26,11 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
       const res = await fetch("/api/recipes/community", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load community recipes");
       return res.json();
+    },
+    // Keep polling every 8s while any recipe is still missing its AI-generated image
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.some((r: Recipe) => !r.imageUrl) ? 8000 : false;
     },
   });
 
@@ -68,8 +75,13 @@ export function CommunityTab({ currentUserId, onRecipeUpdated }: CommunityTabPro
               className="rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-shadow flex flex-col"
             >
               <div className="relative h-36 bg-emerald-50 dark:bg-emerald-950 overflow-hidden flex-shrink-0">
-                {recipe.imageUrl ? (
-                  <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
+                {recipe.imageUrl && !imgErrors.has(recipe.id) ? (
+                  <img
+                    src={`${recipe.imageUrl}?v=2`}
+                    alt={recipe.title}
+                    className="w-full h-full object-cover"
+                    onError={() => onImgError(recipe.id)}
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <ChefHat size={36} className="text-emerald-300" />

@@ -97,6 +97,11 @@ export default function HomePage() {
       return res.json();
     },
     enabled: activeTab === "recipes",
+    // Poll every 8s while any user-submitted recipe is still waiting for its AI image
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.some((r: Recipe) => r.isUserSubmitted && !r.imageUrl) ? 8000 : false;
+    },
   });
 
   const { data: userFavorites = [] } = useQuery<Favorite[]>({

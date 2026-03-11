@@ -697,6 +697,25 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     }
   });
 
+  // Admin: regenerate images for all user-submitted recipes missing a proper /uploads/ image
+  app.post("/api/admin/regenerate-missing-images", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const all = await storage.getRecipes("", "", "");
+      const missing = all.filter(r => r.isUserSubmitted && (!r.imageUrl || !r.imageUrl.startsWith("/uploads/")));
+      console.log(`[admin] Triggering image generation for ${missing.length} user recipes without uploads`);
+      res.json({ triggered: missing.length, ids: missing.map(r => r.id) });
+      for (const r of missing) {
+        await generateAndSaveRecipeImage(r.id, r.title);
+      }
+    } catch (err) {
+      console.error("Admin regenerate images error:", err);
+      res.status(500).json({ message: "Failed to start regeneration" });
+    }
+  });
+
   // ─── SMART CHEF AI ────────────────────────────────────────────
   app.post("/api/chef-chat/save-recipe", isAuthenticated, async (req: any, res) => {
     try {
