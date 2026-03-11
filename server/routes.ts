@@ -114,19 +114,21 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  // Serve uploaded images
-  app.use("/uploads", (req, res, next) => {
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    next();
-  }, (await import("express")).default.static(uploadDir));
+  // Serve uploaded images (setHeaders only fires on 200, not 404)
+  app.use("/uploads", (await import("express")).default.static(uploadDir, {
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    },
+  }));
 
-  // Serve stock images
+  // Serve stock images (setHeaders only fires on 200, not 404)
   const stockImgDir = path.join(process.cwd(), "attached_assets", "stock_images");
   if (!fs.existsSync(stockImgDir)) fs.mkdirSync(stockImgDir, { recursive: true });
-  app.use("/stock-images", (req, res, next) => {
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    next();
-  }, (await import("express")).default.static(stockImgDir));
+  app.use("/stock-images", (await import("express")).default.static(stockImgDir, {
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    },
+  }));
 
   // Seed on startup
   await seedRecipes();

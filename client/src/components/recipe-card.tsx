@@ -59,7 +59,7 @@ export default function RecipeCard({ recipe, onClick, isFavorited }: RecipeCardP
       <div className="relative w-full h-44 bg-gradient-to-br from-primary/10 via-primary/5 to-accent overflow-hidden flex-shrink-0">
         {recipe.imageUrl && !imgError ? (
           <img
-            src={recipe.imageUrl}
+            src={`${recipe.imageUrl}?v=2`}
             alt={recipe.title}
             onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
