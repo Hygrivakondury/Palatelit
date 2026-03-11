@@ -10,12 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Clock, Users, ChefHat, CheckCircle2, Flame, Heart, Star,
-  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink
+  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink, Share2
 } from "lucide-react";
 import type { Recipe, Review, AffiliateLink } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ShareRecipeSheet } from "@/components/share-recipe-sheet";
 
 function openWithDeepLink(deepLinkUrl: string, fallbackUrl: string) {
   if (!deepLinkUrl) { window.open(fallbackUrl, "_blank", "noopener noreferrer"); return; }
@@ -85,6 +86,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
   const [reviewRating, setReviewRating] = useState(5);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [activeTab, setActiveTab] = useState<"ingredients" | "instructions" | "reviews">("ingredients");
+  const [showShare, setShowShare] = useState(false);
 
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
   const currentServings = recipe.servings * servingsMultiplier;
@@ -189,6 +191,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
     : null;
 
   return (
+    <>
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         data-testid="modal-recipe-detail"
@@ -207,6 +210,15 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
 
           {/* Action buttons over image */}
           <div className="absolute top-3 right-3 flex gap-2">
+            {/* Share button */}
+            <button
+              onClick={() => setShowShare(true)}
+              data-testid="button-share-recipe"
+              className="w-9 h-9 rounded-full flex items-center justify-center bg-white/90 dark:bg-black/70 text-muted-foreground hover:text-primary transition-all shadow-md"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+
             {/* Upload photo button */}
             {isAuthenticated && (
               <>
@@ -576,5 +588,10 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
         </ScrollArea>
       </DialogContent>
     </Dialog>
+
+    {showShare && (
+      <ShareRecipeSheet recipe={recipe} onClose={() => setShowShare(false)} />
+    )}
+  </>
   );
 }

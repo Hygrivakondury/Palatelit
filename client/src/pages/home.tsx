@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -116,6 +116,35 @@ export default function HomePage() {
   });
 
   const favoritedRecipeIds = new Set(userFavorites.map((f) => f.recipeId));
+
+  // Auto-open recipe from shared link: ?recipe=123
+  useEffect(() => {
+    if (recipesLoading || recipes.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const recipeId = params.get("recipe");
+    if (!recipeId) return;
+    const found = recipes.find((r) => r.id === parseInt(recipeId, 10));
+    if (found) {
+      setSelectedRecipe(found);
+      // Clean up URL without reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("recipe");
+      window.history.replaceState({}, "", url.toString());
+    } else {
+      // Recipe might be in another sub-tab — fetch it directly
+      fetch(`/api/recipes/${recipeId}`, { credentials: "include" })
+        .then((r) => r.ok ? r.json() : null)
+        .then((recipe) => {
+          if (recipe) {
+            setSelectedRecipe(recipe);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("recipe");
+            window.history.replaceState({}, "", url.toString());
+          }
+        })
+        .catch(() => {});
+    }
+  }, [recipes, recipesLoading]);
 
   const filteredRecipes = recipes.filter((r) => {
     if (showFavoritesOnly && !favoritedRecipeIds.has(r.id)) return false;
