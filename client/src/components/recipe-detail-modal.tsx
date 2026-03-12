@@ -98,6 +98,23 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
   });
   const isAdmin = myProfile?.isAdmin ?? false;
 
+  // Admin: move recipe to a different category tab
+  const moveCategoryMutation = useMutation({
+    mutationFn: async (category: string) => {
+      const res = await apiRequest("PATCH", `/api/admin/recipes/${recipe.id}/category`, { category });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      setRecipe(updated);
+      onRecipeUpdated?.(updated);
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes/community"] });
+      const labels: Record<string, string> = { main: "Dishes", dessert: "Desserts & Sweets", mocktail: "Mocktails & Juices" };
+      toast({ title: "Recipe moved", description: `"${updated.title}" is now in ${labels[updated.category] ?? updated.category}.` });
+    },
+    onError: () => toast({ title: "Failed to move recipe", variant: "destructive" }),
+  });
+
   // Admin: regenerate image
   const regenImageMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/recipes/${recipe.id}/generate-image`),
@@ -340,6 +357,36 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed">{recipe.description}</p>
             </DialogHeader>
+
+            {/* Admin: Move to Tab */}
+            {isAdmin && (
+              <div className="rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 px-4 py-3 space-y-2">
+                <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wide">Admin — Move to Tab</p>
+                <div className="flex gap-2">
+                  {[
+                    { value: "main", label: "🍽️ Dishes" },
+                    { value: "dessert", label: "🍮 Desserts & Sweets" },
+                    { value: "mocktail", label: "🥤 Mocktails & Juices" },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      data-testid={`button-move-to-${value}`}
+                      disabled={recipe.category === value || moveCategoryMutation.isPending}
+                      onClick={() => moveCategoryMutation.mutate(value)}
+                      className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium border transition-all ${
+                        recipe.category === value
+                          ? "bg-violet-600 text-white border-violet-600 cursor-default"
+                          : "bg-white dark:bg-neutral-900 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
+                      }`}
+                    >
+                      {moveCategoryMutation.isPending && recipe.category !== value ? (
+                        <Loader2 className="w-3 h-3 animate-spin mx-auto" />
+                      ) : label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* YouTube link */}
             {recipe.youtubeUrl && (

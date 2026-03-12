@@ -260,6 +260,23 @@ export async function registerRoutes(
     }
   });
 
+  // ─── ADMIN CATEGORY UPDATE ──────────────────────────────────────────
+  app.patch("/api/admin/recipes/:id/category", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const { category } = req.body;
+      const valid = ["main", "dessert", "mocktail"];
+      if (!valid.includes(category)) return res.status(400).json({ message: "Invalid category" });
+      const updated = await storage.updateRecipeCategory(id, category);
+      if (!updated) return res.status(404).json({ message: "Recipe not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
   // ─── ADMIN DELETE ──────────────────────────────────────────────────
   app.delete("/api/recipes/:id", isAuthenticated, async (req: any, res) => {
     try {
