@@ -164,6 +164,23 @@ function ImageManagementSection() {
     queryKey: ["/api/admin/image-stats"],
   });
 
+  const generateMissingMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/regenerate-missing-images"),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      refetchStats();
+      if (data.triggered === 0) {
+        toast({ title: "All recipes already have images!", description: "Nothing to generate." });
+      } else {
+        toast({
+          title: "Generating images",
+          description: `Started generating pictures for ${data.triggered} recipe(s) in the background.`,
+        });
+      }
+    },
+    onError: () => toast({ title: "Failed to start generation", variant: "destructive" }),
+  });
+
   const scanMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/scan-and-fix-images"),
     onSuccess: async (res) => {
@@ -211,6 +228,33 @@ function ImageManagementSection() {
         </div>
       )}
 
+      {/* Generate missing images */}
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <ImageIcon className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-sm text-foreground">Generate Images for All Recipes Without Pictures</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Automatically generates AI images for every recipe that currently has no picture. Runs in the background — images will appear as they are created.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={() => generateMissingMutation.mutate()}
+          disabled={generateMissingMutation.isPending}
+          className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+          data-testid="button-generate-missing-images"
+        >
+          {generateMissingMutation.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <ImageIcon className="w-4 h-4" />
+          )}
+          {generateMissingMutation.isPending ? "Starting…" : "Generate Missing Images"}
+        </Button>
+      </div>
+
+      {/* Scan & Fix mismatched images */}
       <div className="rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-5 space-y-4">
         <div className="flex items-start gap-3">
           <ScanSearch className="w-5 h-5 text-violet-600 mt-0.5 flex-shrink-0" />

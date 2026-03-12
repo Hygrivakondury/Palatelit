@@ -749,16 +749,16 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     }
   });
 
-  // Admin: regenerate images for all user-submitted recipes missing a proper /uploads/ image
+  // Admin: regenerate images for ALL recipes missing a picture
   app.post("/api/admin/regenerate-missing-images", isAuthenticated, async (req: any, res) => {
     try {
       if (!isAdminEmail(req.user?.claims?.email)) {
         return res.status(403).json({ message: "Admin only" });
       }
       const all = await storage.getRecipes("", "", "");
-      const missing = all.filter(r => r.isUserSubmitted && (!r.imageUrl || !r.imageUrl.startsWith("/uploads/")));
-      console.log(`[admin] Triggering image generation for ${missing.length} user recipes without uploads`);
-      res.json({ triggered: missing.length, ids: missing.map(r => r.id) });
+      const missing = all.filter(r => !r.imageUrl);
+      console.log(`[admin] Generating images for ${missing.length} recipes without pictures`);
+      res.json({ triggered: missing.length });
       for (const r of missing) {
         await generateAndSaveRecipeImage(r.id, r.title);
       }
