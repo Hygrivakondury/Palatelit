@@ -19,19 +19,15 @@ import { apiRequest } from "@/lib/queryClient";
 import { ShareRecipeSheet } from "@/components/share-recipe-sheet";
 
 function openWithDeepLink(deepLinkUrl: string, fallbackUrl: string) {
-  if (!deepLinkUrl) { window.open(fallbackUrl, "_blank", "noopener noreferrer"); return; }
-  let opened = false;
-  const onVisibilityChange = () => { if (document.hidden) { opened = true; } };
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  const timer = setTimeout(() => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    if (!opened) window.open(fallbackUrl, "_blank", "noopener noreferrer");
-  }, 1500);
-  window.location.href = deepLinkUrl;
-  setTimeout(() => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    clearTimeout(timer);
-  }, 3000);
+  window.open(fallbackUrl, "_blank", "noopener,noreferrer");
+  if (deepLinkUrl) {
+    const a = document.createElement("a");
+    a.href = deepLinkUrl;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    try { a.click(); } catch (_) {}
+    setTimeout(() => document.body.removeChild(a), 1000);
+  }
 }
 
 const SLOT_ICONS: Record<string, string> = {
