@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink } from "lucide-react";
+import { Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -155,6 +155,104 @@ function AffiliateLinkEditor({ link }: { link: AffiliateLink }) {
   );
 }
 
+function ImageManagementSection() {
+  const { toast } = useToast();
+  const [scanResult, setScanResult] = useState<{ scanning: number; message: string } | null>(null);
+  const [scanRunning, setScanRunning] = useState(false);
+
+  const { data: stats, refetch: refetchStats } = useQuery<{ total: number; withImage: number; noImage: number }>({
+    queryKey: ["/api/admin/image-stats"],
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/scan-and-fix-images"),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setScanResult(data);
+      setScanRunning(true);
+      toast({
+        title: "Scan started",
+        description: `Checking ${data.scanning} recipe image(s) for mismatches in the background. This may take several minutes.`,
+      });
+    },
+    onError: () => toast({ title: "Scan failed", variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-950 flex items-center justify-center">
+            <ImageIcon className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold font-serif text-foreground">Image Management</h1>
+            <p className="text-sm text-muted-foreground">Scan and fix recipe images that don't match their dish</p>
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {stats && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border bg-card p-4 text-center">
+            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Recipes</p>
+          </div>
+          <div className="rounded-xl border bg-card p-4 text-center">
+            <p className="text-2xl font-bold text-emerald-600">{stats.withImage}</p>
+            <p className="text-xs text-muted-foreground mt-1">Have AI Images</p>
+          </div>
+          <div className="rounded-xl border bg-card p-4 text-center">
+            <p className="text-2xl font-bold text-amber-600">{stats.noImage}</p>
+            <p className="text-xs text-muted-foreground mt-1">No Image</p>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <ScanSearch className="w-5 h-5 text-violet-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-sm text-foreground">Scan & Fix Mismatched Images</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Uses AI vision to check every recipe image against its dish name. Any image that doesn't match gets regenerated automatically in the background.
+            </p>
+          </div>
+        </div>
+
+        {scanResult && scanRunning && (
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-4 py-3">
+            <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Scanning {scanResult.scanning} images in the background. New images will appear as they are generated — no need to wait here.
+            </p>
+          </div>
+        )}
+
+        <Button
+          onClick={() => scanMutation.mutate()}
+          disabled={scanMutation.isPending}
+          className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white"
+          data-testid="button-scan-fix-images"
+        >
+          {scanMutation.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <ScanSearch className="w-4 h-4" />
+          )}
+          {scanMutation.isPending ? "Starting scan…" : "Scan & Fix All Mismatched Images"}
+        </Button>
+
+        <p className="text-xs text-muted-foreground text-center">
+          Also use the "Regen Image" button inside any recipe for a quick one-off fix.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -244,6 +342,10 @@ export default function AdminPage() {
           <p>• <strong>Flipkart:</strong> Use <code>flipkart://search?q=…</code> — opens Flipkart app if installed</p>
           <p className="pt-1">If the app isn't installed, the Web URL is opened in the browser automatically after 1.5 seconds.</p>
         </div>
+
+        <Separator />
+
+        <ImageManagementSection />
       </div>
     </div>
   );

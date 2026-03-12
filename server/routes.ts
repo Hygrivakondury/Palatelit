@@ -751,6 +751,63 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     }
   });
 
+  // Admin: scan all recipe images for mismatches and regenerate bad ones
+  app.post("/api/admin/scan-and-fix-images", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const all = await storage.getRecipes("", "", "");
+      const withImages = all.filter(r => r.imageUrl && r.imageUrl.startsWith("/uploads/"));
+      res.json({ scanning: withImages.length, message: "Scan started in background" });
+
+      let mismatched = 0;
+      for (const recipe of withImages) {
+        try {
+          const filepath = path.join(uploadDir, path.basename(recipe.imageUrl!));
+          if (!fs.existsSync(filepath)) { await generateAndSaveRecipeImage(recipe.id, recipe.title); mismatched++; continue; }
+          const b64 = fs.readFileSync(filepath).toString("base64");
+          const check = await openai.chat.completions.create({
+            model: "gpt-4o",
+            max_tokens: 20,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: `data:image/png;base64,${b64}`, detail: "low" } },
+                { type: "text", text: `Does this image clearly show the food dish called "${recipe.title}"? Reply only YES or NO.` },
+              ],
+            }],
+          });
+          const answer = check.choices[0]?.message?.content?.trim().toUpperCase() ?? "NO";
+          if (!answer.startsWith("YES")) {
+            console.log(`[scan] Mismatch detected for recipe ${recipe.id} (${recipe.title}) — regenerating`);
+            await generateAndSaveRecipeImage(recipe.id, recipe.title);
+            mismatched++;
+          }
+        } catch (err) {
+          console.error(`[scan] Error checking recipe ${recipe.id}:`, err);
+        }
+      }
+      console.log(`[scan] Done. ${mismatched} image(s) regenerated out of ${withImages.length} checked.`);
+    } catch (err) {
+      console.error("Scan-and-fix error:", err);
+    }
+  });
+
+  // Admin: get scan status (check how many recipes need images)
+  app.get("/api/admin/image-stats", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const all = await storage.getRecipes("", "", "");
+      const total = all.length;
+      const withImage = all.filter(r => r.imageUrl && r.imageUrl.startsWith("/uploads/")).length;
+      const noImage = all.filter(r => !r.imageUrl).length;
+      res.json({ total, withImage, noImage });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get stats" });
+    }
+  });
+
   // ─── SMART CHEF AI ────────────────────────────────────────────
   app.post("/api/chef-chat/save-recipe", isAuthenticated, async (req: any, res) => {
     try {

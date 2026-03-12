@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Clock, Users, ChefHat, CheckCircle2, Flame, Heart, Star,
-  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink, Share2
+  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink, Share2, RefreshCw
 } from "lucide-react";
 import type { Recipe, Review, AffiliateLink } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -90,6 +90,27 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
 
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
   const currentServings = recipe.servings * servingsMultiplier;
+
+  // Admin check
+  const { data: myProfile } = useQuery<{ isAdmin: boolean }>({
+    queryKey: ["/api/my-profile"],
+    enabled: isAuthenticated,
+  });
+  const isAdmin = myProfile?.isAdmin ?? false;
+
+  // Admin: regenerate image
+  const regenImageMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/recipes/${recipe.id}/generate-image`),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      const updated = { ...recipe, imageUrl: data.imageUrl };
+      setRecipe(updated);
+      onRecipeUpdated?.(updated);
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+      toast({ title: "Image regenerated!", description: "New AI photo has been generated for this recipe." });
+    },
+    onError: () => toast({ title: "Failed to regenerate image", variant: "destructive" }),
+  });
 
   // Favorite state
   const { data: favoriteData } = useQuery<{ favorited: boolean }>({
@@ -244,6 +265,24 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                   {recipe.imageUrl ? "Change photo" : "Add photo"}
                 </button>
               </>
+            )}
+
+            {/* Admin: Regenerate image button */}
+            {isAdmin && (
+              <button
+                onClick={() => regenImageMutation.mutate()}
+                disabled={regenImageMutation.isPending}
+                data-testid="button-regen-image"
+                title="Regenerate image (Admin)"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/80 hover:bg-violet-700 backdrop-blur-sm text-white rounded-full text-xs font-medium transition-all"
+              >
+                {regenImageMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {regenImageMutation.isPending ? "Generating…" : "Regen Image"}
+              </button>
             )}
 
             {/* Favorite button */}
