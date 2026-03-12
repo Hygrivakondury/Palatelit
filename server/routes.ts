@@ -9,7 +9,7 @@ import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES, AFFILIATE_SLOTS, type AffiliateSlot } from "@shared/schema";
 import { seedRecipes } from "./seed";
-import { sendContributionEmail } from "./email";
+import { sendContributionEmail, sendFeedbackResponseEmail } from "./email";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -257,6 +257,54 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to remove favorite" });
+    }
+  });
+
+  // ─── USER FEEDBACK ──────────────────────────────────────────────────
+  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const claims = req.user.claims;
+      const { message } = req.body;
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+      const row = await storage.createFeedback({
+        userEmail: claims.email,
+        userName: [claims.first_name, claims.last_name].filter(Boolean).join(" ") || "Anonymous",
+        userProfileImage: claims.profile_image_url ?? "",
+        message: message.trim(),
+      });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/admin/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const rows = await storage.getAllFeedback();
+      res.json(rows);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  app.post("/api/admin/feedback/:id/respond", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const { adminResponse } = req.body;
+      if (!adminResponse || typeof adminResponse !== "string" || !adminResponse.trim()) {
+        return res.status(400).json({ message: "Response is required" });
+      }
+      const updated = await storage.respondToFeedback(id, adminResponse.trim());
+      if (!updated) return res.status(404).json({ message: "Feedback not found" });
+      await sendFeedbackResponseEmail(updated.userEmail, updated.userName, updated.message, adminResponse.trim());
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to send response" });
     }
   });
 

@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch, CheckCircle2, AlertCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch, CheckCircle2, AlertCircle, MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import type { AffiliateLink } from "@shared/schema";
+import type { AffiliateLink, UserFeedback } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 
 const SLOT_META: Record<string, { emoji: string; color: string; bgColor: string }> = {
@@ -297,6 +299,128 @@ function ImageManagementSection() {
   );
 }
 
+function FeedbackItem({ item }: { item: UserFeedback }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState(item.adminResponse ?? "");
+
+  const respondMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/admin/feedback/${item.id}/respond`, { adminResponse: replyText }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feedback"] });
+      toast({ title: "Response sent!", description: "The user will receive an email with your reply." });
+    },
+    onError: () => toast({ title: "Failed to send response", variant: "destructive" }),
+  });
+
+  const initials = item.userName?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
+
+  return (
+    <div className={`rounded-xl border bg-card p-4 space-y-3 ${item.adminResponse ? "border-emerald-200 dark:border-emerald-800" : "border-border"}`}>
+      <div className="flex items-start gap-3">
+        <Avatar className="w-9 h-9 flex-shrink-0">
+          <AvatarImage src={item.userProfileImage ?? undefined} />
+          <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{initials}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-foreground">{item.userName || item.userEmail}</p>
+            <p className="text-xs text-muted-foreground truncate">{item.userEmail}</p>
+            <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">{date}</span>
+          </div>
+          <p className="text-sm text-foreground mt-1 leading-relaxed whitespace-pre-wrap">{item.message}</p>
+        </div>
+      </div>
+
+      {item.adminResponse && (
+        <div className="ml-12 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 space-y-0.5">
+          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Your response</p>
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{item.adminResponse}</p>
+        </div>
+      )}
+
+      <div className="ml-12">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 text-xs text-primary hover:underline"
+          data-testid={`button-toggle-reply-${item.id}`}
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {item.adminResponse ? "Edit response" : "Reply"}
+        </button>
+        {expanded && (
+          <div className="mt-2 space-y-2">
+            <Textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Type your response…"
+              rows={3}
+              className="resize-none text-sm"
+              data-testid={`input-reply-${item.id}`}
+            />
+            <Button
+              size="sm"
+              onClick={() => respondMutation.mutate()}
+              disabled={!replyText.trim() || respondMutation.isPending}
+              className="gap-2"
+              data-testid={`button-send-reply-${item.id}`}
+            >
+              {respondMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              {respondMutation.isPending ? "Sending…" : "Send Response"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FeedbackSection() {
+  const { data: feedback = [], isLoading } = useQuery<UserFeedback[]>({
+    queryKey: ["/api/admin/feedback"],
+  });
+
+  const unread = feedback.filter((f) => !f.adminResponse).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold font-serif text-foreground">User Feedback</h1>
+              {unread > 0 && (
+                <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-semibold">{unread} new</span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">Read and respond to feedback from your community</p>
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />)}</div>
+      ) : feedback.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-2">
+          <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto" />
+          <p className="text-sm text-muted-foreground">No feedback yet. Users can share feedback via the menu in the app.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {feedback.map((item) => <FeedbackItem key={item.id} item={item} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -386,6 +510,10 @@ export default function AdminPage() {
           <p>• <strong>Flipkart:</strong> Use <code>flipkart://search?q=…</code> — opens Flipkart app if installed</p>
           <p className="pt-1">If the app isn't installed, the Web URL is opened in the browser automatically after 1.5 seconds.</p>
         </div>
+
+        <Separator />
+
+        <FeedbackSection />
 
         <Separator />
 

@@ -274,3 +274,24 @@ export const DIETARY_TAGS = ["Vegan", "Gluten-Free", "Jain Friendly"] as const;
 
 export type CuisineType = typeof CUISINE_TYPES[number];
 export type DietaryTag = typeof DIETARY_TAGS[number];
+
+export const userFeedback = pgTable("user_feedback", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userEmail: varchar("user_email").notNull(),
+  userName: text("user_name").notNull().default(""),
+  userProfileImage: text("user_profile_image").notNull().default(""),
+  message: text("message").notNull(),
+  adminResponse: text("admin_response"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(userFeedback).omit({
+  id: true,
+  adminResponse: true,
+  respondedAt: true,
+  createdAt: true,
+});
+
+export type UserFeedback = typeof userFeedback.$inferSelect;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;

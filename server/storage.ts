@@ -1,8 +1,9 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
   type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
+  type UserFeedback,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
@@ -62,6 +63,10 @@ export interface IStorage {
   deleteCommunityMessage(id: number): Promise<void>;
   // Admin category change
   updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined>;
+  // Feedback
+  createFeedback(data: { userEmail: string; userName: string; userProfileImage: string; message: string }): Promise<UserFeedback>;
+  getAllFeedback(): Promise<UserFeedback[]>;
+  respondToFeedback(id: number, adminResponse: string): Promise<UserFeedback | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -373,6 +378,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined> {
     const [updated] = await db.update(recipes).set({ category }).where(eq(recipes.id, id)).returning();
+    return updated;
+  }
+
+  async createFeedback(data: { userEmail: string; userName: string; userProfileImage: string; message: string }): Promise<UserFeedback> {
+    const [row] = await db.insert(userFeedback).values(data).returning();
+    return row;
+  }
+
+  async getAllFeedback(): Promise<UserFeedback[]> {
+    return db.select().from(userFeedback).orderBy(desc(userFeedback.createdAt));
+  }
+
+  async respondToFeedback(id: number, adminResponse: string): Promise<UserFeedback | undefined> {
+    const [updated] = await db
+      .update(userFeedback)
+      .set({ adminResponse, respondedAt: new Date() })
+      .where(eq(userFeedback.id, id))
+      .returning();
     return updated;
   }
 

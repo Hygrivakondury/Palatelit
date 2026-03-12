@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import RecipeCard from "@/components/recipe-card";
 import RecipeDetailModal from "@/components/recipe-detail-modal";
 import { SmartChefChat } from "@/components/smart-chef-chat";
@@ -17,7 +21,7 @@ import { MealPlanTab } from "@/components/meal-plan-tab";
 import {
   Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
-  Candy, GlassWater
+  Candy, GlassWater, MessageSquare, Loader2
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
@@ -65,6 +69,7 @@ const RECIPE_SUB_TABS: { id: RecipeSubTab; label: string; icon: React.ReactNode;
 export default function HomePage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<TabId>("recipes");
   const [recipeSubTab, setRecipeSubTab] = useState<RecipeSubTab>("main");
@@ -74,6 +79,18 @@ export default function HomePage() {
   const [selectedDietary, setSelectedDietary] = useState<string>("All");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const feedbackMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/feedback", { message: feedbackMessage }),
+    onSuccess: () => {
+      setShowFeedbackDialog(false);
+      setFeedbackMessage("");
+      toast({ title: "Feedback sent!", description: "Thank you — the team will review it shortly." });
+    },
+    onError: () => toast({ title: "Failed to send feedback", variant: "destructive" }),
+  });
 
   const currentUserId: string = (user as any)?.id ?? (user as any)?.claims?.sub ?? "";
   const activeSubTabMeta = RECIPE_SUB_TABS.find((s) => s.id === recipeSubTab)!;
@@ -256,6 +273,13 @@ export default function HomePage() {
                       {favoritedRecipeIds.size}
                     </span>
                   )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => setShowFeedbackDialog(true)}
+                  data-testid="menu-item-feedback"
+                >
+                  <MessageSquare className="w-4 h-4" /> Share Feedback
                 </DropdownMenuItem>
                 {myProfile?.isAdmin && (
                   <DropdownMenuItem
@@ -532,6 +556,49 @@ export default function HomePage() {
       <SmartChefChat
         recipeContext={selectedRecipe ? selectedRecipe.title : null}
       />
+
+      {/* Feedback Dialog */}
+      <Dialog open={showFeedbackDialog} onOpenChange={(open) => { setShowFeedbackDialog(open); if (!open) setFeedbackMessage(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Share Your Feedback
+            </DialogTitle>
+            <DialogDescription>
+              Tell us what you love, what you'd like to see, or anything else on your mind. We read every message.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <Textarea
+              data-testid="input-feedback-message"
+              placeholder="Your feedback…"
+              value={feedbackMessage}
+              onChange={(e) => setFeedbackMessage(e.target.value)}
+              rows={5}
+              className="resize-none"
+            />
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => { setShowFeedbackDialog(false); setFeedbackMessage(""); }}
+                data-testid="button-feedback-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => feedbackMutation.mutate()}
+                disabled={!feedbackMessage.trim() || feedbackMutation.isPending}
+                data-testid="button-feedback-submit"
+                className="gap-2"
+              >
+                {feedbackMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                {feedbackMutation.isPending ? "Sending…" : "Send Feedback"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
