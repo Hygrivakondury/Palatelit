@@ -7,7 +7,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES, AFFILIATE_SLOTS, type AffiliateSlot } from "@shared/schema";
+import { insertRecipeSchema, insertReviewSchema, insertChallengeSchema, CUISINE_TYPES, DIETARY_TAGS, AFFILIATE_SLOTS, type AffiliateSlot } from "@shared/schema";
 import { seedRecipes } from "./seed";
 import { sendContributionEmail, sendFeedbackResponseEmail } from "./email";
 
@@ -87,6 +87,61 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     console.log(`[image] Auto-generated image for recipe ${id} (${title})`);
   } catch (err) {
     console.error(`[image] Failed to auto-generate image for recipe ${id}:`, err);
+  }
+}
+
+async function enrichRecipeMetadata(
+  id: number,
+  title: string,
+  description: string,
+  ingredients: string[]
+): Promise<void> {
+  try {
+    const cuisineList = CUISINE_TYPES.join(", ");
+    const tagList = DIETARY_TAGS.join(", ");
+    const ingredientSample = ingredients.slice(0, 20).join(", ");
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert in Indian vegetarian cuisine. Given a recipe, identify:
+1. The regional Indian cuisine type — choose EXACTLY one from: ${cuisineList}
+2. Which dietary labels apply — choose ANY that are truly applicable from: ${tagList}
+
+Rules:
+- "Vegan": no dairy, no honey, no animal products whatsoever
+- "Gluten-Free": no wheat, no maida, no semolina/rava, no barley, no rye
+- "Jain Friendly": no root vegetables (onion, garlic, potato, carrot, beet, ginger)
+
+Respond in JSON: {"cuisineType": "...", "dietaryTags": ["...", "..."]}
+Return ONLY the JSON, no extra text.`,
+        },
+        {
+          role: "user",
+          content: `Recipe: ${title}\nDescription: ${description}\nIngredients: ${ingredientSample}`,
+        },
+      ],
+      max_tokens: 100,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw);
+
+    const cuisineType = (CUISINE_TYPES as readonly string[]).includes(parsed.cuisineType)
+      ? parsed.cuisineType
+      : "Pan-Indian";
+
+    const dietaryTags = Array.isArray(parsed.dietaryTags)
+      ? parsed.dietaryTags.filter((t: string) => (DIETARY_TAGS as readonly string[]).includes(t))
+      : [];
+
+    await storage.updateRecipeMetadata(id, cuisineType, dietaryTags);
+    console.log(`[enrich] Recipe ${id} (${title}): cuisine=${cuisineType}, tags=[${dietaryTags.join(", ")}]`);
+  } catch (err) {
+    console.error(`[enrich] Failed to enrich metadata for recipe ${id}:`, err);
   }
 }
 
@@ -198,8 +253,9 @@ export async function registerRoutes(
       const recipe = await storage.createRecipe(body);
       res.status(201).json(recipe);
 
-      // Background: generate an AI photo for the new community recipe
+      // Background: generate AI photo + enrich cuisine/tags in parallel
       generateAndSaveRecipeImage(recipe.id, recipe.title);
+      enrichRecipeMetadata(recipe.id, recipe.title, recipe.description ?? "", recipe.ingredients ?? []);
 
       const source = req.body.challengeId ? "challenge" : "community";
       const recipientEmail = user.email;
@@ -960,8 +1016,9 @@ Return ONLY valid raw JSON. No markdown fences. No extra explanation.`,
 
       res.json({ recipe: newRecipe, alreadyExists: false });
 
-      // Background: generate an AI photo for the chatbot-saved recipe
+      // Background: generate AI photo + enrich cuisine/tags in parallel
       generateAndSaveRecipeImage(newRecipe.id, newRecipe.title);
+      enrichRecipeMetadata(newRecipe.id, newRecipe.title, newRecipe.description ?? "", newRecipe.ingredients ?? []);
 
       const recipientEmail = req.user.claims.email;
       if (recipientEmail) {

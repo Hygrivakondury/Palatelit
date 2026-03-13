@@ -61,6 +61,7 @@ export interface IStorage {
   // Admin delete
   deleteRecipe(id: number): Promise<void>;
   deleteCommunityMessage(id: number): Promise<void>;
+  updateRecipeMetadata(id: number, cuisineType: string, dietaryTags: string[]): Promise<Recipe | undefined>;
   // Admin category change
   updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined>;
   // Feedback
@@ -374,6 +375,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommunityMessage(id: number): Promise<void> {
     await db.delete(communityMessages).where(eq(communityMessages.id, id));
+  }
+
+  async updateRecipeMetadata(id: number, cuisineType: string, dietaryTags: string[]): Promise<Recipe | undefined> {
+    const [updated] = await db.update(recipes).set({ cuisineType, dietaryTags }).where(eq(recipes.id, id)).returning();
+    return updated;
   }
 
   async updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined> {
