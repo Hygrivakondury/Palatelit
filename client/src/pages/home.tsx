@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,7 +21,7 @@ import { MealPlanTab } from "@/components/meal-plan-tab";
 import {
   Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
-  Candy, GlassWater, MessageSquare, Loader2
+  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
@@ -30,91 +30,139 @@ import { CUISINE_TYPES } from "@shared/schema";
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
 type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan";
 
-function FilmstripDecoration({ subTab, visible }: { subTab: RecipeSubTab; visible: boolean }) {
-  const stripDark = "#14100a";
-  const holeColor = "rgba(212,185,100,0.28)";
-  const edgeColor = "#0d0b06";
+type RecipeSubTab = "main" | "dessert" | "mocktail";
 
-  const opacity = visible ? 1 : 0;
-  const transition = "opacity 0.4s ease, transform 0.4s ease";
+const SPROCKET_STYLE: React.CSSProperties = {
+  height: 22,
+  background: "#0d0a06",
+  backgroundImage: `repeating-linear-gradient(
+    to right,
+    #0d0a06 0px, #0d0a06 7px,
+    rgba(212,185,100,0.30) 7px, rgba(212,185,100,0.30) 19px,
+    #0d0a06 19px, #0d0a06 30px
+  )`,
+  backgroundSize: "30px 100%",
+  backgroundPosition: "4px center",
+};
 
-  if (subTab === "main") {
-    const tx = visible ? "translateX(0)" : "translateX(24px)";
-    return (
-      <div
-        aria-hidden
-        style={{
-          position: "fixed", top: 56, right: 0, bottom: 0, width: 26,
-          opacity, transform: tx, transition, pointerEvents: "none", zIndex: 20,
-        }}
-      >
-        <svg width="26" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-          <defs>
-            <pattern id="fs-right" x="0" y="0" width="26" height="28" patternUnits="userSpaceOnUse">
-              <rect width="26" height="28" fill={stripDark} />
-              <rect x="0" y="0" width="3" height="28" fill={edgeColor} />
-              <rect x="23" y="0" width="3" height="28" fill={edgeColor} />
-              <rect x="4" y="4" width="8" height="20" rx="2" fill={holeColor} />
-              <rect x="14" y="4" width="8" height="20" rx="2" fill={holeColor} />
-            </pattern>
-          </defs>
-          <rect width="26" height="100%" fill="url(#fs-right)" />
-        </svg>
-      </div>
-    );
-  }
+function FilmstripCarousel({ recipes, onSelect }: { recipes: Recipe[]; onSelect: (r: Recipe) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(true);
 
-  if (subTab === "dessert") {
-    const tx = visible ? "translateX(0)" : "translateX(-24px)";
-    return (
-      <div
-        aria-hidden
-        style={{
-          position: "fixed", top: 56, left: 0, bottom: 0, width: 26,
-          opacity, transform: tx, transition, pointerEvents: "none", zIndex: 20,
-        }}
-      >
-        <svg width="26" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-          <defs>
-            <pattern id="fs-left" x="0" y="0" width="26" height="28" patternUnits="userSpaceOnUse">
-              <rect width="26" height="28" fill={stripDark} />
-              <rect x="0" y="0" width="3" height="28" fill={edgeColor} />
-              <rect x="23" y="0" width="3" height="28" fill={edgeColor} />
-              <rect x="4" y="4" width="8" height="20" rx="2" fill={holeColor} />
-              <rect x="14" y="4" width="8" height="20" rx="2" fill={holeColor} />
-            </pattern>
-          </defs>
-          <rect width="26" height="100%" fill="url(#fs-left)" />
-        </svg>
-      </div>
-    );
-  }
+  const updateArrows = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
 
-  const ty = visible ? "translateY(0)" : "translateY(-24px)";
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateArrows();
+    el.addEventListener("scroll", updateArrows, { passive: true });
+    return () => el.removeEventListener("scroll", updateArrows);
+  }, [recipes, updateArrows]);
+
+  const scroll = (dir: "left" | "right") => {
+    scrollRef.current?.scrollBy({ left: dir === "right" ? 640 : -640, behavior: "smooth" });
+  };
+
+  if (recipes.length === 0) return null;
+
   return (
-    <div
-      aria-hidden
-      style={{
-        position: "fixed", top: 56, left: 0, right: 0, height: 26,
-        opacity, transform: ty, transition, pointerEvents: "none", zIndex: 20,
-      }}
-    >
-      <svg width="100%" height="26" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-        <defs>
-          <pattern id="fs-top" x="0" y="0" width="28" height="26" patternUnits="userSpaceOnUse">
-            <rect width="28" height="26" fill={stripDark} />
-            <rect x="0" y="0" width="28" height="3" fill={edgeColor} />
-            <rect x="0" y="23" width="28" height="3" fill={edgeColor} />
-            <rect x="4" y="4" width="20" height="8" rx="2" fill={holeColor} />
-            <rect x="4" y="14" width="20" height="8" rx="2" fill={holeColor} />
-          </pattern>
-        </defs>
-        <rect width="100%" height="26" fill="url(#fs-top)" />
-      </svg>
+    <div className="relative mb-8 rounded-xl overflow-hidden shadow-lg" style={{ background: "#0d0a06" }}>
+      {/* Top sprocket holes */}
+      <div style={SPROCKET_STYLE} />
+
+      {/* Scrollable film frames */}
+      <div
+        ref={scrollRef}
+        className="flex overflow-x-auto filmstrip-scroll"
+        style={{
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          background: "#1a1410",
+          gap: 3,
+          padding: "3px 3px",
+        }}
+      >
+        {recipes.map((recipe, i) => (
+          <div
+            key={recipe.id}
+            data-testid={`filmstrip-frame-${recipe.id}`}
+            onClick={() => onSelect(recipe)}
+            className="flex-shrink-0 group cursor-pointer select-none"
+            style={{ width: 190, scrollSnapAlign: "start" }}
+          >
+            {/* Frame counter bar */}
+            <div
+              className="flex items-center justify-between px-2 font-mono"
+              style={{ fontSize: 9, background: "#0d0a06", color: "#8a7a50", height: 16 }}
+            >
+              <span>{String(i + 1).padStart(3, "0")}</span>
+              <span style={{ letterSpacing: 2 }}>▲ ▲</span>
+              <span>{String(i + 1).padStart(3, "0")}</span>
+            </div>
+
+            {/* Image */}
+            <div className="relative overflow-hidden" style={{ height: 160 }}>
+              {recipe.imageUrl ? (
+                <img
+                  src={recipe.imageUrl}
+                  alt={recipe.title}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.06]"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <ChefHat className="w-8 h-8 text-muted-foreground" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-primary/25 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <span className="bg-white/90 text-primary text-[11px] font-semibold rounded-full px-3 py-1 shadow">
+                  View Recipe
+                </span>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-2">
+                <p className="text-white text-[11px] font-semibold leading-snug line-clamp-2">{recipe.title}</p>
+                {recipe.cuisineType && (
+                  <p className="text-white/55 text-[9px] mt-0.5 truncate">{recipe.cuisineType}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom sprocket holes */}
+      <div style={SPROCKET_STYLE} />
+
+      {/* Left arrow */}
+      {canLeft && (
+        <button
+          onClick={() => scroll("left")}
+          aria-label="Scroll left"
+          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition-colors shadow-lg"
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
+
+      {/* Right arrow */}
+      {canRight && (
+        <button
+          onClick={() => scroll("right")}
+          aria-label="Scroll right"
+          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition-colors shadow-lg"
+        >
+          <ChevronRight size={18} />
+        </button>
+      )}
     </div>
   );
 }
-type RecipeSubTab = "main" | "dessert" | "mocktail";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={16} /> },
@@ -277,7 +325,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
-      <FilmstripDecoration subTab={recipeSubTab} visible={activeTab === "recipes"} />
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
@@ -543,8 +590,15 @@ export default function HomePage() {
             </div>
           )}
 
+          {!recipesLoading && filteredRecipes.length > 0 && (
+            <FilmstripCarousel
+              recipes={filteredRecipes}
+              onSelect={setSelectedRecipe}
+            />
+          )}
+
           {recipesLoading ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="bg-card border border-card-border rounded-2xl overflow-hidden">
                   <Skeleton className="w-full h-44" />
@@ -580,7 +634,7 @@ export default function HomePage() {
               </Button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredRecipes.map((recipe) => (
                 <RecipeCard
                   key={recipe.id}
