@@ -29,6 +29,91 @@ import { CUISINE_TYPES } from "@shared/schema";
 
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
 type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan";
+
+function FilmstripDecoration({ subTab, visible }: { subTab: RecipeSubTab; visible: boolean }) {
+  const stripDark = "#14100a";
+  const holeColor = "rgba(212,185,100,0.28)";
+  const edgeColor = "#0d0b06";
+
+  const opacity = visible ? 1 : 0;
+  const transition = "opacity 0.4s ease, transform 0.4s ease";
+
+  if (subTab === "main") {
+    const tx = visible ? "translateX(0)" : "translateX(24px)";
+    return (
+      <div
+        aria-hidden
+        style={{
+          position: "fixed", top: 56, right: 0, bottom: 0, width: 26,
+          opacity, transform: tx, transition, pointerEvents: "none", zIndex: 20,
+        }}
+      >
+        <svg width="26" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+          <defs>
+            <pattern id="fs-right" x="0" y="0" width="26" height="28" patternUnits="userSpaceOnUse">
+              <rect width="26" height="28" fill={stripDark} />
+              <rect x="0" y="0" width="3" height="28" fill={edgeColor} />
+              <rect x="23" y="0" width="3" height="28" fill={edgeColor} />
+              <rect x="4" y="4" width="8" height="20" rx="2" fill={holeColor} />
+              <rect x="14" y="4" width="8" height="20" rx="2" fill={holeColor} />
+            </pattern>
+          </defs>
+          <rect width="26" height="100%" fill="url(#fs-right)" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (subTab === "dessert") {
+    const tx = visible ? "translateX(0)" : "translateX(-24px)";
+    return (
+      <div
+        aria-hidden
+        style={{
+          position: "fixed", top: 56, left: 0, bottom: 0, width: 26,
+          opacity, transform: tx, transition, pointerEvents: "none", zIndex: 20,
+        }}
+      >
+        <svg width="26" height="100%" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+          <defs>
+            <pattern id="fs-left" x="0" y="0" width="26" height="28" patternUnits="userSpaceOnUse">
+              <rect width="26" height="28" fill={stripDark} />
+              <rect x="0" y="0" width="3" height="28" fill={edgeColor} />
+              <rect x="23" y="0" width="3" height="28" fill={edgeColor} />
+              <rect x="4" y="4" width="8" height="20" rx="2" fill={holeColor} />
+              <rect x="14" y="4" width="8" height="20" rx="2" fill={holeColor} />
+            </pattern>
+          </defs>
+          <rect width="26" height="100%" fill="url(#fs-left)" />
+        </svg>
+      </div>
+    );
+  }
+
+  const ty = visible ? "translateY(0)" : "translateY(-24px)";
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "fixed", top: 56, left: 0, right: 0, height: 26,
+        opacity, transform: ty, transition, pointerEvents: "none", zIndex: 20,
+      }}
+    >
+      <svg width="100%" height="26" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
+        <defs>
+          <pattern id="fs-top" x="0" y="0" width="28" height="26" patternUnits="userSpaceOnUse">
+            <rect width="28" height="26" fill={stripDark} />
+            <rect x="0" y="0" width="28" height="3" fill={edgeColor} />
+            <rect x="0" y="23" width="28" height="3" fill={edgeColor} />
+            <rect x="4" y="4" width="20" height="8" rx="2" fill={holeColor} />
+            <rect x="4" y="14" width="20" height="8" rx="2" fill={holeColor} />
+          </pattern>
+        </defs>
+        <rect width="100%" height="26" fill="url(#fs-top)" />
+      </svg>
+    </div>
+  );
+}
 type RecipeSubTab = "main" | "dessert" | "mocktail";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -192,6 +277,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
+      <FilmstripDecoration subTab={recipeSubTab} visible={activeTab === "recipes"} />
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
