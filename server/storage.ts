@@ -62,6 +62,8 @@ export interface IStorage {
   deleteRecipe(id: number): Promise<void>;
   deleteCommunityMessage(id: number): Promise<void>;
   updateRecipeMetadata(id: number, cuisineType: string, dietaryTags: string[]): Promise<Recipe | undefined>;
+  updateRecipe(id: number, data: Partial<InsertRecipe>): Promise<Recipe | undefined>;
+  getAllCommunityMessages(): Promise<{ id: number; recipeId: number; senderName: string | null; content: string; createdAt: Date | null }[]>;
   // Admin category change
   updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined>;
   // Feedback
@@ -380,6 +382,21 @@ export class DatabaseStorage implements IStorage {
   async updateRecipeMetadata(id: number, cuisineType: string, dietaryTags: string[]): Promise<Recipe | undefined> {
     const [updated] = await db.update(recipes).set({ cuisineType, dietaryTags }).where(eq(recipes.id, id)).returning();
     return updated;
+  }
+
+  async updateRecipe(id: number, data: Partial<InsertRecipe>): Promise<Recipe | undefined> {
+    const [updated] = await db.update(recipes).set(data).where(eq(recipes.id, id)).returning();
+    return updated;
+  }
+
+  async getAllCommunityMessages(): Promise<{ id: number; recipeId: number; senderName: string | null; content: string; createdAt: Date | null }[]> {
+    return db.select({
+      id: communityMessages.id,
+      recipeId: communityMessages.recipeId,
+      senderName: communityMessages.senderName,
+      content: communityMessages.content,
+      createdAt: communityMessages.createdAt,
+    }).from(communityMessages).orderBy(desc(communityMessages.createdAt)).limit(200);
   }
 
   async updateRecipeCategory(id: number, category: string): Promise<Recipe | undefined> {

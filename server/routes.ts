@@ -412,6 +412,86 @@ export async function registerRoutes(
     }
   });
 
+  // ─── ADMIN RECIPE CRUD ────────────────────────────────────────
+  app.get("/api/admin/recipes", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const all = await storage.getRecipes();
+      res.json(all);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch recipes" });
+    }
+  });
+
+  app.patch("/api/admin/recipes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const { title, description, ingredients, instructions, prepTime, cookTime, servings, cuisineType, dietaryTags, category, youtubeUrl, imageUrl } = req.body;
+      const updated = await storage.updateRecipe(id, {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(ingredients !== undefined && { ingredients }),
+        ...(instructions !== undefined && { instructions }),
+        ...(prepTime !== undefined && { prepTime: Number(prepTime) }),
+        ...(cookTime !== undefined && { cookTime: Number(cookTime) }),
+        ...(servings !== undefined && { servings: Number(servings) }),
+        ...(cuisineType !== undefined && { cuisineType }),
+        ...(dietaryTags !== undefined && { dietaryTags }),
+        ...(category !== undefined && { category }),
+        ...(youtubeUrl !== undefined && { youtubeUrl }),
+        ...(imageUrl !== undefined && { imageUrl }),
+      });
+      if (!updated) return res.status(404).json({ message: "Recipe not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("Admin update recipe error:", err);
+      res.status(500).json({ message: "Failed to update recipe" });
+    }
+  });
+
+  app.post("/api/admin/recipes", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const { title, description, ingredients, instructions, prepTime, cookTime, servings, cuisineType, dietaryTags, category, youtubeUrl } = req.body;
+      if (!title?.trim() || !ingredients?.length || !instructions?.length) {
+        return res.status(400).json({ message: "Title, ingredients and instructions are required" });
+      }
+      const recipe = await storage.createRecipe({
+        title: title.trim(),
+        description: description?.trim() || "",
+        ingredients: Array.isArray(ingredients) ? ingredients : [ingredients],
+        instructions: Array.isArray(instructions) ? instructions : [instructions],
+        prepTime: Number(prepTime) || 15,
+        cookTime: Number(cookTime) || 20,
+        servings: Number(servings) || 4,
+        cuisineType: cuisineType || "Pan-Indian",
+        dietaryTags: Array.isArray(dietaryTags) ? dietaryTags : [],
+        category: ["main", "dessert", "mocktail"].includes(category) ? category : "main",
+        youtubeUrl: youtubeUrl || null,
+        isUserSubmitted: false,
+        authorId: req.user.claims.sub,
+      });
+      res.status(201).json(recipe);
+      generateAndSaveRecipeImage(recipe.id, recipe.title);
+      enrichRecipeMetadata(recipe.id, recipe.title, recipe.description ?? "", recipe.ingredients ?? []);
+    } catch (err) {
+      console.error("Admin create recipe error:", err);
+      res.status(500).json({ message: "Failed to create recipe" });
+    }
+  });
+
+  app.get("/api/admin/community-messages", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user.claims.email)) return res.status(403).json({ message: "Admin only" });
+      const msgs = await storage.getAllCommunityMessages();
+      res.json(msgs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch community messages" });
+    }
+  });
+
   // ─── REVIEWS ──────────────────────────────────────────────────
   app.get("/api/recipes/:id/reviews", async (req, res) => {
     try {

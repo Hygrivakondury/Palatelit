@@ -7,52 +7,498 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch, CheckCircle2, AlertCircle, MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch,
+  MessageSquare, Send, ChevronDown, ChevronUp, UtensilsCrossed, Users,
+  Plus, X, Pencil, Trash2, Search, CheckCircle2, ChefHat
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import type { AffiliateLink, UserFeedback } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
+import type { AffiliateLink, UserFeedback, Recipe } from "@shared/schema";
+import { CUISINE_TYPES, DIETARY_TAGS } from "@shared/schema";
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────
+type AdminTab = "recipes" | "community" | "commerce" | "feedback" | "images";
 
 const SLOT_META: Record<string, { emoji: string; color: string; bgColor: string }> = {
-  amazon: { emoji: "🛒", color: "text-orange-700", bgColor: "bg-orange-50 border-orange-200" },
-  blinkit: { emoji: "⚡", color: "text-yellow-700", bgColor: "bg-yellow-50 border-yellow-200" },
-  flipkart: { emoji: "🏪", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200" },
+  amazon: { emoji: "🛒", color: "text-orange-700", bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800" },
+  blinkit: { emoji: "⚡", color: "text-yellow-700", bgColor: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800" },
+  flipkart: { emoji: "🏪", color: "text-blue-700", bgColor: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800" },
 };
 
+// ─── RECIPE EDITOR ──────────────────────────────────────────────────────────
+type RecipeFormData = {
+  title: string;
+  description: string;
+  ingredientsText: string;
+  instructionsText: string;
+  prepTime: string;
+  cookTime: string;
+  servings: string;
+  cuisineType: string;
+  dietaryTags: string[];
+  category: string;
+  youtubeUrl: string;
+};
+
+function emptyForm(): RecipeFormData {
+  return {
+    title: "", description: "", ingredientsText: "", instructionsText: "",
+    prepTime: "15", cookTime: "20", servings: "4",
+    cuisineType: "Pan-Indian", dietaryTags: [], category: "main", youtubeUrl: "",
+  };
+}
+
+function recipeToForm(r: Recipe): RecipeFormData {
+  return {
+    title: r.title,
+    description: r.description,
+    ingredientsText: r.ingredients.join("\n"),
+    instructionsText: r.instructions.join("\n"),
+    prepTime: String(r.prepTime),
+    cookTime: String(r.cookTime),
+    servings: String(r.servings),
+    cuisineType: r.cuisineType,
+    dietaryTags: r.dietaryTags ?? [],
+    category: r.category ?? "main",
+    youtubeUrl: r.youtubeUrl ?? "",
+  };
+}
+
+function formToPayload(f: RecipeFormData) {
+  return {
+    title: f.title.trim(),
+    description: f.description.trim(),
+    ingredients: f.ingredientsText.split("\n").map(s => s.trim()).filter(Boolean),
+    instructions: f.instructionsText.split("\n").map(s => s.trim()).filter(Boolean),
+    prepTime: Number(f.prepTime) || 15,
+    cookTime: Number(f.cookTime) || 20,
+    servings: Number(f.servings) || 4,
+    cuisineType: f.cuisineType,
+    dietaryTags: f.dietaryTags,
+    category: f.category,
+    youtubeUrl: f.youtubeUrl.trim() || null,
+  };
+}
+
+function RecipeEditorForm({
+  initial,
+  onSave,
+  onCancel,
+  isPending,
+  mode,
+}: {
+  initial: RecipeFormData;
+  onSave: (payload: ReturnType<typeof formToPayload>) => void;
+  onCancel: () => void;
+  isPending: boolean;
+  mode: "create" | "edit";
+}) {
+  const [f, setF] = useState<RecipeFormData>(initial);
+  const set = (k: keyof RecipeFormData) => (val: string) => setF(prev => ({ ...prev, [k]: val }));
+
+  const toggleTag = (tag: string) =>
+    setF(prev => ({
+      ...prev,
+      dietaryTags: prev.dietaryTags.includes(tag)
+        ? prev.dietaryTags.filter(t => t !== tag)
+        : [...prev.dietaryTags, tag],
+    }));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipe Title *</Label>
+          <Input value={f.title} onChange={e => set("title")(e.target.value)} placeholder="e.g. Dal Makhani" data-testid="admin-input-title" />
+        </div>
+
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</Label>
+          <Textarea value={f.description} onChange={e => set("description")(e.target.value)} rows={2} placeholder="Brief description of the dish" className="resize-none" />
+        </div>
+
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ingredients * <span className="normal-case font-normal">(one per line)</span></Label>
+          <Textarea value={f.ingredientsText} onChange={e => set("ingredientsText")(e.target.value)} rows={6} placeholder={"2 cups whole black lentils\n1 cup kidney beans\n3 tbsp butter"} className="resize-y font-mono text-sm" data-testid="admin-input-ingredients" />
+        </div>
+
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Instructions * <span className="normal-case font-normal">(one step per line)</span></Label>
+          <Textarea value={f.instructionsText} onChange={e => set("instructionsText")(e.target.value)} rows={6} placeholder={"Soak lentils overnight.\nBring to boil with 3 cups water.\nAdd butter and cream."} className="resize-y font-mono text-sm" data-testid="admin-input-instructions" />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prep Time (min)</Label>
+          <Input type="number" min={0} value={f.prepTime} onChange={e => set("prepTime")(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cook Time (min)</Label>
+          <Input type="number" min={0} value={f.cookTime} onChange={e => set("cookTime")(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Servings</Label>
+          <Input type="number" min={1} value={f.servings} onChange={e => set("servings")(e.target.value)} />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tab / Category</Label>
+          <Select value={f.category} onValueChange={set("category")}>
+            <SelectTrigger data-testid="admin-select-category"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="main">🍽️ Dishes</SelectItem>
+              <SelectItem value="dessert">🍬 Desserts & Sweets</SelectItem>
+              <SelectItem value="mocktail">🥤 Mocktails & Juices</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cuisine Type</Label>
+          <Select value={f.cuisineType} onValueChange={set("cuisineType")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CUISINE_TYPES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="sm:col-span-2 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dietary Tags</Label>
+          <div className="flex flex-wrap gap-2">
+            {DIETARY_TAGS.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                  f.dietaryTags.includes(tag)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border text-foreground hover:border-primary/50"
+                }`}
+                data-testid={`admin-tag-${tag}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="sm:col-span-2 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">YouTube URL <span className="normal-case font-normal">(optional)</span></Label>
+          <Input value={f.youtubeUrl} onChange={e => set("youtubeUrl")(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <Button
+          onClick={() => onSave(formToPayload(f))}
+          disabled={isPending || !f.title.trim() || !f.ingredientsText.trim() || !f.instructionsText.trim()}
+          className="flex-1 gap-2"
+          data-testid="admin-button-save-recipe"
+        >
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {isPending ? "Saving…" : mode === "create" ? "Create Recipe" : "Save Changes"}
+        </Button>
+        <Button variant="outline" onClick={onCancel} className="gap-2">
+          <X className="w-4 h-4" /> Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── RECIPE MANAGEMENT SECTION ─────────────────────────────────────────────
+function RecipeManagementSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState<"all" | "main" | "dessert" | "mocktail">("all");
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  const { data: allRecipes = [], isLoading } = useQuery<Recipe[]>({
+    queryKey: ["/api/admin/recipes"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { id: number; data: ReturnType<typeof formToPayload> }) =>
+      apiRequest("PATCH", `/api/admin/recipes/${payload.id}`, payload.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+      toast({ title: "Recipe updated!", description: "Changes saved across the whole site." });
+      setEditingRecipe(null);
+    },
+    onError: () => toast({ title: "Failed to update recipe", variant: "destructive" }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: ReturnType<typeof formToPayload>) => apiRequest("POST", "/api/admin/recipes", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+      toast({ title: "Recipe created!", description: "AI image generation started in background." });
+      setShowCreate(false);
+    },
+    onError: () => toast({ title: "Failed to create recipe", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/recipes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/recipes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
+      toast({ title: "Recipe deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete recipe", variant: "destructive" }),
+  });
+
+  const filtered = allRecipes.filter(r => {
+    if (filterCategory !== "all" && r.category !== filterCategory) return false;
+    if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const categoryLabel = (c: string) =>
+    c === "main" ? "🍽️ Dishes" : c === "dessert" ? "🍬 Desserts" : "🥤 Drinks";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold font-serif text-foreground">Recipe Management</h2>
+          <p className="text-sm text-muted-foreground">{allRecipes.length} recipes total</p>
+        </div>
+        <Button onClick={() => { setShowCreate(true); setEditingRecipe(null); }} className="gap-2" data-testid="admin-button-new-recipe">
+          <Plus className="w-4 h-4" /> New Recipe
+        </Button>
+      </div>
+
+      {showCreate && (
+        <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5 space-y-3">
+          <h3 className="font-semibold text-foreground flex items-center gap-2"><Plus className="w-4 h-4 text-primary" /> Create New Recipe</h3>
+          <RecipeEditorForm
+            initial={emptyForm()}
+            onSave={(payload) => createMutation.mutate(payload)}
+            onCancel={() => setShowCreate(false)}
+            isPending={createMutation.isPending}
+            mode="create"
+          />
+        </div>
+      )}
+
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search recipes…"
+            className="pl-9"
+            data-testid="admin-input-search-recipes"
+          />
+        </div>
+        <Select value={filterCategory} onValueChange={(v: typeof filterCategory) => setFilterCategory(v)}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Tabs</SelectItem>
+            <SelectItem value="main">🍽️ Dishes</SelectItem>
+            <SelectItem value="dessert">🍬 Desserts</SelectItem>
+            <SelectItem value="mocktail">🥤 Drinks</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.length === 0 && (
+            <p className="text-center text-muted-foreground py-10">No recipes match your filters.</p>
+          )}
+          {filtered.map(recipe => (
+            <div key={recipe.id}>
+              <div
+                className={`rounded-xl border bg-card p-3 flex items-center gap-3 transition-all ${editingRecipe?.id === recipe.id ? "border-primary/60 ring-1 ring-primary/30" : "border-border hover:border-primary/30"}`}
+              >
+                <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+                  {recipe.imageUrl ? (
+                    <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ChefHat className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{recipe.title}</p>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="text-xs text-muted-foreground">{categoryLabel(recipe.category ?? "main")}</span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs text-muted-foreground">{recipe.cuisineType}</span>
+                    {recipe.isUserSubmitted && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Community</Badge>}
+                    {!recipe.imageUrl && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-600">No image</Badge>}
+                  </div>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingRecipe(editingRecipe?.id === recipe.id ? null : recipe);
+                      setShowCreate(false);
+                    }}
+                    data-testid={`admin-button-edit-${recipe.id}`}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (confirm(`Delete "${recipe.title}"? This cannot be undone.`)) {
+                        deleteMutation.mutate(recipe.id);
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`admin-button-delete-${recipe.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              {editingRecipe?.id === recipe.id && (
+                <div className="rounded-b-xl border border-t-0 border-primary/40 bg-card/60 p-5 space-y-3">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5"><Pencil className="w-3 h-3" /> Editing: {recipe.title}</p>
+                  <RecipeEditorForm
+                    initial={recipeToForm(recipe)}
+                    onSave={(payload) => updateMutation.mutate({ id: recipe.id, data: payload })}
+                    onCancel={() => setEditingRecipe(null)}
+                    isPending={updateMutation.isPending}
+                    mode="edit"
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── COMMUNITY MODERATION ──────────────────────────────────────────────────
+function CommunityModerationSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+
+  type AdminMsg = { id: number; recipeId: number; senderName: string | null; content: string; createdAt: string | null };
+
+  const { data: messages = [], isLoading } = useQuery<AdminMsg[]>({
+    queryKey: ["/api/admin/community-messages"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/community/messages/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/community-messages"] });
+      toast({ title: "Message deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete message", variant: "destructive" }),
+  });
+
+  const filtered = messages.filter(m =>
+    !search || m.content.toLowerCase().includes(search.toLowerCase()) || m.senderName?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-bold font-serif text-foreground">Community Moderation</h2>
+        <p className="text-sm text-muted-foreground">{messages.length} recent messages</p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search messages…" className="pl-9" />
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-center text-muted-foreground py-10">No messages found.</p>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(msg => (
+            <div key={msg.id} className="rounded-xl border bg-card p-3 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Users className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-foreground">{msg.senderName || "Anonymous"}</p>
+                  <p className="text-xs text-muted-foreground">Recipe #{msg.recipeId}</p>
+                  {msg.createdAt && (
+                    <p className="text-xs text-muted-foreground ml-auto">
+                      {new Date(msg.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </p>
+                  )}
+                </div>
+                <p className="text-sm text-foreground mt-0.5 leading-relaxed line-clamp-3">{msg.content}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive flex-shrink-0"
+                onClick={() => {
+                  if (confirm("Delete this message permanently?")) deleteMutation.mutate(msg.id);
+                }}
+                disabled={deleteMutation.isPending}
+                data-testid={`admin-delete-msg-${msg.id}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AFFILIATE EDITOR ──────────────────────────────────────────────────────
 function AffiliateLinkEditor({ link }: { link: AffiliateLink }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   const [label, setLabel] = useState(link.label);
   const [buttonText, setButtonText] = useState(link.buttonText);
   const [webUrl, setWebUrl] = useState(link.webUrl);
   const [deepLinkUrl, setDeepLinkUrl] = useState(link.deepLinkUrl);
   const [isActive, setIsActive] = useState(link.isActive);
-
-  const meta = SLOT_META[link.slot] ?? { emoji: "🛍️", color: "text-gray-700", bgColor: "bg-gray-50 border-gray-200" };
+  const meta = SLOT_META[link.slot] ?? { emoji: "🛍️", color: "text-gray-700", bgColor: "bg-card border-border" };
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest("PUT", `/api/affiliate-links/${link.slot}`, {
-        label, buttonText, webUrl, deepLinkUrl, isActive,
-      });
-    },
+    mutationFn: async () => apiRequest("PUT", `/api/affiliate-links/${link.slot}`, { label, buttonText, webUrl, deepLinkUrl, isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/affiliate-links"] });
-      toast({ title: "Saved!", description: `${label} link updated successfully.` });
+      toast({ title: "Saved!", description: `${label} link updated.` });
     },
-    onError: () => {
-      toast({ title: "Save failed", description: "Please check your inputs and try again.", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
 
-  const isDirty =
-    label !== link.label ||
-    buttonText !== link.buttonText ||
-    webUrl !== link.webUrl ||
-    deepLinkUrl !== link.deepLinkUrl ||
-    isActive !== link.isActive;
+  const isDirty = label !== link.label || buttonText !== link.buttonText || webUrl !== link.webUrl || deepLinkUrl !== link.deepLinkUrl || isActive !== link.isActive;
 
   return (
     <div className={`rounded-xl border p-5 space-y-4 ${meta.bgColor}`} data-testid={`affiliate-editor-${link.slot}`}>
@@ -66,97 +512,40 @@ function AffiliateLinkEditor({ link }: { link: AffiliateLink }) {
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor={`active-${link.slot}`} className="text-sm font-medium">Active</Label>
-          <Switch
-            id={`active-${link.slot}`}
-            checked={isActive}
-            onCheckedChange={setIsActive}
-            data-testid={`toggle-active-${link.slot}`}
-          />
+          <Switch id={`active-${link.slot}`} checked={isActive} onCheckedChange={setIsActive} data-testid={`toggle-active-${link.slot}`} />
         </div>
       </div>
-
       <div className="space-y-3">
         <div className="space-y-1">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Display Label</Label>
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. Amazon"
-            className="bg-white dark:bg-neutral-900"
-            data-testid={`input-label-${link.slot}`}
-          />
+          <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Amazon" className="bg-white dark:bg-neutral-900" data-testid={`input-label-${link.slot}`} />
         </div>
-
         <div className="space-y-1">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Button Text</Label>
-          <Input
-            value={buttonText}
-            onChange={(e) => setButtonText(e.target.value)}
-            placeholder="e.g. Buy Spices on Amazon"
-            className="bg-white dark:bg-neutral-900"
-            data-testid={`input-button-text-${link.slot}`}
-          />
+          <Input value={buttonText} onChange={e => setButtonText(e.target.value)} placeholder="e.g. Buy on Amazon" className="bg-white dark:bg-neutral-900" data-testid={`input-button-text-${link.slot}`} />
         </div>
-
         <div className="space-y-1">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Web URL <span className="normal-case font-normal">(browser fallback)</span>
-          </Label>
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Web URL <span className="normal-case font-normal">(browser fallback)</span></Label>
           <div className="flex gap-2">
-            <Input
-              value={webUrl}
-              onChange={(e) => setWebUrl(e.target.value)}
-              placeholder="https://..."
-              className="bg-white dark:bg-neutral-900 font-mono text-xs"
-              data-testid={`input-web-url-${link.slot}`}
-            />
-            {webUrl && (
-              <a
-                href={webUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-md border border-border bg-white hover:bg-muted transition-colors"
-              >
-                <ExternalLink className="w-4 h-4 text-muted-foreground" />
-              </a>
-            )}
+            <Input value={webUrl} onChange={e => setWebUrl(e.target.value)} placeholder="https://..." className="bg-white dark:bg-neutral-900 font-mono text-xs" data-testid={`input-web-url-${link.slot}`} />
+            {webUrl && <a href={webUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-md border border-border bg-white hover:bg-muted transition-colors"><ExternalLink className="w-4 h-4 text-muted-foreground" /></a>}
           </div>
         </div>
-
         <div className="space-y-1">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Deep Link URL <span className="normal-case font-normal">(opens native app)</span>
-          </Label>
-          <Input
-            value={deepLinkUrl}
-            onChange={(e) => setDeepLinkUrl(e.target.value)}
-            placeholder="e.g. amzn://... or blinkit://..."
-            className="bg-white dark:bg-neutral-900 font-mono text-xs"
-            data-testid={`input-deep-link-${link.slot}`}
-          />
-          <p className="text-xs text-muted-foreground">
-            If the user has the app installed, this opens it directly. Falls back to Web URL after 1.5s if app not found.
-          </p>
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deep Link URL <span className="normal-case font-normal">(opens native app)</span></Label>
+          <Input value={deepLinkUrl} onChange={e => setDeepLinkUrl(e.target.value)} placeholder="e.g. amzn://... or blinkit://..." className="bg-white dark:bg-neutral-900 font-mono text-xs" data-testid={`input-deep-link-${link.slot}`} />
+          <p className="text-xs text-muted-foreground">Falls back to Web URL after 1.5s if app not found.</p>
         </div>
       </div>
-
-      <Button
-        onClick={() => saveMutation.mutate()}
-        disabled={saveMutation.isPending || !isDirty}
-        className="w-full gap-2"
-        data-testid={`button-save-${link.slot}`}
-      >
-        {saveMutation.isPending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Save className="w-4 h-4" />
-        )}
+      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !isDirty} className="w-full gap-2" data-testid={`button-save-${link.slot}`}>
+        {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {saveMutation.isPending ? "Saving…" : isDirty ? "Save Changes" : "No Changes"}
       </Button>
     </div>
   );
 }
 
+// ─── IMAGE MANAGEMENT ──────────────────────────────────────────────────────
 function ImageManagementSection() {
   const { toast } = useToast();
   const [scanResult, setScanResult] = useState<{ scanning: number; message: string } | null>(null);
@@ -171,14 +560,7 @@ function ImageManagementSection() {
     onSuccess: async (res) => {
       const data = await res.json();
       refetchStats();
-      if (data.triggered === 0) {
-        toast({ title: "All recipes already have images!", description: "Nothing to generate." });
-      } else {
-        toast({
-          title: "Generating images",
-          description: `Started generating pictures for ${data.triggered} recipe(s) in the background.`,
-        });
-      }
+      toast({ title: data.triggered === 0 ? "All recipes have images!" : "Generating images…", description: data.triggered === 0 ? "Nothing to generate." : `Started for ${data.triggered} recipe(s).` });
     },
     onError: () => toast({ title: "Failed to start generation", variant: "destructive" }),
   });
@@ -189,39 +571,27 @@ function ImageManagementSection() {
       const data = await res.json();
       setScanResult(data);
       setScanRunning(true);
-      toast({
-        title: "Scan started",
-        description: `Checking ${data.scanning} recipe image(s) for mismatches in the background. This may take several minutes.`,
-      });
+      toast({ title: "Scan started", description: `Checking ${data.scanning} image(s) in background.` });
     },
     onError: () => toast({ title: "Scan failed", variant: "destructive" }),
   });
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-950 flex items-center justify-center">
-            <ImageIcon className="w-5 h-5 text-violet-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold font-serif text-foreground">Image Management</h1>
-            <p className="text-sm text-muted-foreground">Scan and fix recipe images that don't match their dish</p>
-          </div>
-        </div>
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-bold font-serif text-foreground">Image Management</h2>
+        <p className="text-sm text-muted-foreground">AI-generate and fix recipe images</p>
       </div>
-
-      <Separator />
 
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border bg-card p-4 text-center">
             <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total Recipes</p>
+            <p className="text-xs text-muted-foreground mt-1">Total</p>
           </div>
           <div className="rounded-xl border bg-card p-4 text-center">
             <p className="text-2xl font-bold text-emerald-600">{stats.withImage}</p>
-            <p className="text-xs text-muted-foreground mt-1">Have AI Images</p>
+            <p className="text-xs text-muted-foreground mt-1">Have Images</p>
           </div>
           <div className="rounded-xl border bg-card p-4 text-center">
             <p className="text-2xl font-bold text-amber-600">{stats.noImage}</p>
@@ -230,75 +600,45 @@ function ImageManagementSection() {
         </div>
       )}
 
-      {/* Generate missing images */}
       <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-5 space-y-3">
         <div className="flex items-start gap-3">
           <ImageIcon className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-semibold text-sm text-foreground">Generate Images for All Recipes Without Pictures</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Automatically generates AI images for every recipe that currently has no picture. Runs in the background — images will appear as they are created.
-            </p>
+            <p className="font-semibold text-sm text-foreground">Generate Images for All Without Pictures</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Automatically generates AI images for every recipe without one. Runs in background.</p>
           </div>
         </div>
-        <Button
-          onClick={() => generateMissingMutation.mutate()}
-          disabled={generateMissingMutation.isPending}
-          className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-          data-testid="button-generate-missing-images"
-        >
-          {generateMissingMutation.isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <ImageIcon className="w-4 h-4" />
-          )}
+        <Button onClick={() => generateMissingMutation.mutate()} disabled={generateMissingMutation.isPending} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-generate-missing-images">
+          {generateMissingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
           {generateMissingMutation.isPending ? "Starting…" : "Generate Missing Images"}
         </Button>
       </div>
 
-      {/* Scan & Fix mismatched images */}
       <div className="rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-5 space-y-4">
         <div className="flex items-start gap-3">
           <ScanSearch className="w-5 h-5 text-violet-600 mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-semibold text-sm text-foreground">Scan & Fix Mismatched Images</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Uses AI vision to check every recipe image against its dish name. Any image that doesn't match gets regenerated automatically in the background.
-            </p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Uses AI vision to check every image against its dish name. Regenerates wrong ones automatically.</p>
           </div>
         </div>
-
         {scanResult && scanRunning && (
           <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-4 py-3">
             <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              Scanning {scanResult.scanning} images in the background. New images will appear as they are generated — no need to wait here.
-            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400">Scanning {scanResult.scanning} images. Images will appear as they are generated.</p>
           </div>
         )}
-
-        <Button
-          onClick={() => scanMutation.mutate()}
-          disabled={scanMutation.isPending}
-          className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white"
-          data-testid="button-scan-fix-images"
-        >
-          {scanMutation.isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <ScanSearch className="w-4 h-4" />
-          )}
+        <Button onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending} className="w-full gap-2 bg-violet-600 hover:bg-violet-700 text-white" data-testid="button-scan-fix-images">
+          {scanMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
           {scanMutation.isPending ? "Starting scan…" : "Scan & Fix All Mismatched Images"}
         </Button>
-
-        <p className="text-xs text-muted-foreground text-center">
-          Also use the "Regen Image" button inside any recipe for a quick one-off fix.
-        </p>
+        <p className="text-xs text-muted-foreground text-center">Also use "Regen Image" inside any recipe for a quick one-off fix.</p>
       </div>
     </div>
   );
 }
 
+// ─── FEEDBACK SECTION ──────────────────────────────────────────────────────
 function FeedbackItem({ item }: { item: UserFeedback }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -314,7 +654,7 @@ function FeedbackItem({ item }: { item: UserFeedback }) {
     onError: () => toast({ title: "Failed to send response", variant: "destructive" }),
   });
 
-  const initials = item.userName?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const initials = item.userName?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
   const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
 
   return (
@@ -333,40 +673,21 @@ function FeedbackItem({ item }: { item: UserFeedback }) {
           <p className="text-sm text-foreground mt-1 leading-relaxed whitespace-pre-wrap">{item.message}</p>
         </div>
       </div>
-
       {item.adminResponse && (
-        <div className="ml-12 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2 space-y-0.5">
+        <div className="ml-12 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-3 py-2">
           <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Your response</p>
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{item.adminResponse}</p>
         </div>
       )}
-
       <div className="ml-12">
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
-          data-testid={`button-toggle-reply-${item.id}`}
-        >
+        <button onClick={() => setExpanded(v => !v)} className="flex items-center gap-1 text-xs text-primary hover:underline" data-testid={`button-toggle-reply-${item.id}`}>
           {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           {item.adminResponse ? "Edit response" : "Reply"}
         </button>
         {expanded && (
           <div className="mt-2 space-y-2">
-            <Textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Type your response…"
-              rows={3}
-              className="resize-none text-sm"
-              data-testid={`input-reply-${item.id}`}
-            />
-            <Button
-              size="sm"
-              onClick={() => respondMutation.mutate()}
-              disabled={!replyText.trim() || respondMutation.isPending}
-              className="gap-2"
-              data-testid={`button-send-reply-${item.id}`}
-            >
+            <Textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type your response…" rows={3} className="resize-none text-sm" data-testid={`input-reply-${item.id}`} />
+            <Button size="sm" onClick={() => respondMutation.mutate()} disabled={!replyText.trim() || respondMutation.isPending} className="gap-2" data-testid={`button-send-reply-${item.id}`}>
               {respondMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               {respondMutation.isPending ? "Sending…" : "Send Response"}
             </Button>
@@ -381,143 +702,157 @@ function FeedbackSection() {
   const { data: feedback = [], isLoading } = useQuery<UserFeedback[]>({
     queryKey: ["/api/admin/feedback"],
   });
-
-  const unread = feedback.filter((f) => !f.adminResponse).length;
+  const unread = feedback.filter(f => !f.adminResponse).length;
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
-            <MessageSquare className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold font-serif text-foreground">User Feedback</h1>
-              {unread > 0 && (
-                <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-semibold">{unread} new</span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">Read and respond to feedback from your community</p>
-          </div>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <div>
+          <h2 className="text-lg font-bold font-serif text-foreground">User Feedback</h2>
+          <p className="text-sm text-muted-foreground">{feedback.length} messages · {unread} need reply</p>
         </div>
+        {unread > 0 && <Badge className="bg-red-500 text-white ml-auto">{unread} unread</Badge>}
       </div>
-
-      <Separator />
-
       {isLoading ? (
-        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />)}</div>
+        <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>
       ) : feedback.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-2">
-          <MessageSquare className="w-8 h-8 text-muted-foreground mx-auto" />
-          <p className="text-sm text-muted-foreground">No feedback yet. Users can share feedback via the menu in the app.</p>
-        </div>
+        <p className="text-center text-muted-foreground py-10">No feedback yet.</p>
       ) : (
-        <div className="space-y-3">
-          {feedback.map((item) => <FeedbackItem key={item.id} item={item} />)}
-        </div>
+        <div className="space-y-3">{feedback.map(item => <FeedbackItem key={item.id} item={item} />)}</div>
       )}
     </div>
   );
 }
 
+// ─── MAIN ADMIN PAGE ───────────────────────────────────────────────────────
+const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ReactNode; desc: string }[] = [
+  { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={15} />, desc: "Create, edit, delete any recipe" },
+  { id: "community", label: "Community", icon: <Users size={15} />, desc: "Moderate messages" },
+  { id: "commerce", label: "Commerce", icon: <ShoppingBag size={15} />, desc: "Affiliate link slots" },
+  { id: "feedback", label: "Feedback", icon: <MessageSquare size={15} />, desc: "Reply to users" },
+  { id: "images", label: "Images", icon: <ImageIcon size={15} />, desc: "Generate & fix AI images" },
+];
+
 export default function AdminPage() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>("recipes");
 
-  const { data: profile } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/my-profile"],
-  });
-
-  const { data: affiliateLinks = [], isLoading } = useQuery<AffiliateLink[]>({
+  const { data: profile } = useQuery<{ isAdmin: boolean }>({ queryKey: ["/api/my-profile"] });
+  const { data: affiliateLinks = [], isLoading: linksLoading } = useQuery<AffiliateLink[]>({
     queryKey: ["/api/affiliate-links"],
     enabled: profile?.isAdmin === true,
   });
+  const { data: feedback = [] } = useQuery<UserFeedback[]>({
+    queryKey: ["/api/admin/feedback"],
+    enabled: profile?.isAdmin === true,
+  });
+  const unreadFeedback = feedback.filter(f => !f.adminResponse).length;
 
-  if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (!profile) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    </div>
+  );
 
-  if (!profile.isAdmin) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-5xl">🔒</div>
-        <h1 className="text-xl font-bold text-foreground">Admin Access Only</h1>
-        <p className="text-muted-foreground text-sm text-center">
-          This page is restricted to authorised administrators.
-        </p>
-        <Button variant="outline" onClick={() => navigate("/")} className="gap-2">
-          <ArrowLeft className="w-4 h-4" /> Back to App
-        </Button>
-      </div>
-    );
-  }
+  if (!profile.isAdmin) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
+      <div className="text-5xl">🔒</div>
+      <h1 className="text-xl font-bold text-foreground">Admin Access Only</h1>
+      <p className="text-muted-foreground text-sm text-center">This page is restricted to authorised administrators.</p>
+      <Button variant="outline" onClick={() => navigate("/")} className="gap-2">
+        <ArrowLeft className="w-4 h-4" /> Back to App
+      </Button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2 -ml-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
+            <ArrowLeft className="w-4 h-4" /> Back
           </Button>
+          <div className="ml-2">
+            <h1 className="text-2xl font-bold font-serif text-foreground">Admin Panel</h1>
+            <p className="text-sm text-muted-foreground">Palate Lit — Site Management</p>
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ShoppingBag className="w-5 h-5 text-primary" />
+        <div className="flex gap-6 flex-col lg:flex-row">
+          {/* Sidebar nav */}
+          <aside className="lg:w-52 flex-shrink-0">
+            <nav className="space-y-1 lg:sticky lg:top-6">
+              {ADMIN_TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  data-testid={`admin-tab-${tab.id}`}
+                  className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                    activeTab === tab.id
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span className="mt-0.5 flex-shrink-0">{tab.icon}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold">{tab.label}</p>
+                      {tab.id === "feedback" && unreadFeedback > 0 && (
+                        <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 font-bold">{unreadFeedback}</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-tight hidden lg:block">{tab.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </nav>
+
+            {/* Quick reference */}
+            <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground space-y-2 hidden lg:block">
+              <p className="font-semibold text-foreground">What you can do:</p>
+              <ul className="space-y-1 list-disc list-inside leading-relaxed">
+                <li>Create/edit/delete any recipe</li>
+                <li>Move recipes between Dishes, Sweets, Drinks tabs</li>
+                <li>Set cuisine & dietary tags</li>
+                <li>Regen/fix AI images</li>
+                <li>Moderate community messages</li>
+                <li>Reply to user feedback</li>
+                <li>Manage affiliate commerce links</li>
+                <li>Create/toggle weekly challenges</li>
+              </ul>
+              <p className="text-[10px] text-muted-foreground pt-1">Weekly Challenge controls are in the Challenge tab of the main app.</p>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold font-serif text-foreground">Smart Commerce</h1>
-              <p className="text-sm text-muted-foreground">Manage affiliate links shown in every recipe</p>
-            </div>
-          </div>
+          </aside>
+
+          {/* Main content */}
+          <main className="flex-1 min-w-0 border border-border rounded-2xl p-5 bg-card">
+            {activeTab === "recipes" && <RecipeManagementSection />}
+            {activeTab === "community" && <CommunityModerationSection />}
+            {activeTab === "commerce" && (
+              <div className="space-y-5">
+                <div>
+                  <h2 className="text-lg font-bold font-serif text-foreground">Smart Commerce</h2>
+                  <p className="text-sm text-muted-foreground">Affiliate link slots shown in every recipe. Updates apply site-wide immediately.</p>
+                </div>
+                <div className="rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+                  <p className="font-semibold">How Deep Links work:</p>
+                  <p>• <strong>Amazon:</strong> <code>amzn://link.amazon.in/redirect?url=…</code></p>
+                  <p>• <strong>Blinkit:</strong> <code>blinkit://search?q=…</code></p>
+                  <p>• <strong>Flipkart:</strong> <code>flipkart://search?q=…</code></p>
+                  <p className="pt-1">Falls back to Web URL after 1.5s if app isn't installed.</p>
+                </div>
+                {linksLoading ? (
+                  <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />)}</div>
+                ) : (
+                  <div className="space-y-4">{affiliateLinks.map(link => <AffiliateLinkEditor key={link.slot} link={link} />)}</div>
+                )}
+              </div>
+            )}
+            {activeTab === "feedback" && <FeedbackSection />}
+            {activeTab === "images" && <ImageManagementSection />}
+          </main>
         </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Affiliate Link Slots</h2>
-          <p className="text-sm text-muted-foreground">
-            Each active slot appears as a button in the "Get Ingredients Fast" section inside every recipe. Paste your affiliate URLs here — updates take effect immediately across the whole site.
-          </p>
-        </div>
-
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-64 rounded-xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {affiliateLinks.map((link) => (
-              <AffiliateLinkEditor key={link.slot} link={link} />
-            ))}
-          </div>
-        )}
-
-        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1">
-          <p className="font-semibold">How Deep Links work:</p>
-          <p>• <strong>Amazon:</strong> Use <code>amzn://link.amazon.in/redirect?url=…</code> — opens Amazon app if installed</p>
-          <p>• <strong>Blinkit:</strong> Use <code>blinkit://search?q=…</code> — opens Blinkit app if installed</p>
-          <p>• <strong>Flipkart:</strong> Use <code>flipkart://search?q=…</code> — opens Flipkart app if installed</p>
-          <p className="pt-1">If the app isn't installed, the Web URL is opened in the browser automatically after 1.5 seconds.</p>
-        </div>
-
-        <Separator />
-
-        <FeedbackSection />
-
-        <Separator />
-
-        <ImageManagementSection />
       </div>
     </div>
   );
