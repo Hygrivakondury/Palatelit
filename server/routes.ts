@@ -136,6 +136,7 @@ export async function registerRoutes(
   // ─── RECIPES ──────────────────────────────────────────────────
   app.get("/api/recipes", async (req, res) => {
     try {
+      res.setHeader("Cache-Control", "no-store");
       const search = req.query.search as string | undefined;
       const cuisine = req.query.cuisine as string | undefined;
       const category = req.query.category as string | undefined;
@@ -149,6 +150,7 @@ export async function registerRoutes(
 
   app.get("/api/recipes/community", async (_req, res) => {
     try {
+      res.setHeader("Cache-Control", "no-store");
       const communityRecipes = await storage.getCommunityRecipes();
       res.json(communityRecipes);
     } catch (err) {
