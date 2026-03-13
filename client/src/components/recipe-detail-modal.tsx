@@ -77,7 +77,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [recipe, setRecipe] = useState(initialRecipe);
-  const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [selectedServings, setSelectedServings] = useState(recipe.servings);
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [hoveredStar, setHoveredStar] = useState(0);
@@ -85,7 +85,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
   const [showShare, setShowShare] = useState(false);
 
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
-  const currentServings = recipe.servings * servingsMultiplier;
+  const scale = selectedServings / recipe.servings;
 
   // Admin check
   const { data: myProfile } = useQuery<{ isAdmin: boolean }>({
@@ -441,33 +441,59 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                 <p className="text-sm font-bold text-foreground">{recipe.cookTime} min</p>
               </div>
               {/* Smart Serving Scaler spans 2 columns */}
-              <div className="col-span-2 bg-primary/5 border border-primary/20 rounded-xl p-3 flex flex-col items-center gap-1" data-testid="servings-scaler">
-                <div className="flex justify-center"><Users className="w-4 h-4 text-primary" /></div>
-                <p className="text-xs text-muted-foreground">Servings</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setServingsMultiplier(m => Math.max(0.5, m - 0.5))}
-                    disabled={servingsMultiplier <= 0.5}
-                    data-testid="button-servings-decrease"
-                    className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="text-sm font-bold text-foreground w-8 text-center" data-testid="text-servings-count">
-                    {currentServings % 1 === 0 ? currentServings : currentServings.toFixed(1)}
-                  </span>
-                  <button
-                    onClick={() => setServingsMultiplier(m => Math.min(4, m + 0.5))}
-                    disabled={servingsMultiplier >= 4}
-                    data-testid="button-servings-increase"
-                    className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+              <div className="col-span-2 bg-primary/5 border border-primary/20 rounded-xl p-3 space-y-2" data-testid="servings-scaler">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-primary" />
+                    <p className="text-xs font-semibold text-foreground">Servings</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedServings(s => Math.max(1, s - 1))}
+                      disabled={selectedServings <= 1}
+                      data-testid="button-servings-decrease"
+                      className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-base font-bold text-primary w-8 text-center" data-testid="text-servings-count">
+                      {selectedServings}
+                    </span>
+                    <button
+                      onClick={() => setSelectedServings(s => Math.min(50, s + 1))}
+                      disabled={selectedServings >= 50}
+                      data-testid="button-servings-increase"
+                      className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-                {servingsMultiplier !== 1 && (
-                  <p className="text-xs text-primary font-medium">{servingsMultiplier}× original</p>
-                )}
+                <div className="flex gap-1 flex-wrap">
+                  {[1, 2, 4, 6, 8, 10, 12].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => setSelectedServings(n)}
+                      data-testid={`button-servings-preset-${n}`}
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-all ${
+                        selectedServings === n
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  {selectedServings !== recipe.servings && (
+                    <button
+                      onClick={() => setSelectedServings(recipe.servings)}
+                      data-testid="button-servings-reset"
+                      className="px-2 py-0.5 rounded-full text-xs font-medium border border-dashed border-muted-foreground/50 text-muted-foreground hover:border-primary hover:text-primary transition-all ml-auto"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -496,9 +522,9 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                   <ChefHat className="w-4 h-4 text-primary" />
                   <h3 className="font-serif text-base font-bold text-foreground">Ingredients</h3>
                   <span className="text-xs text-muted-foreground ml-auto">{recipe.ingredients.length} items</span>
-                  {servingsMultiplier !== 1 && (
+                  {scale !== 1 && (
                     <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                      Scaled {servingsMultiplier}×
+                      Scaled for {selectedServings}
                     </span>
                   )}
                 </div>
@@ -510,7 +536,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                       className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30 border border-border"
                     >
                       <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                      <span className="text-sm text-foreground">{scaleIngredient(ingredient, servingsMultiplier)}</span>
+                      <span className="text-sm text-foreground">{scaleIngredient(ingredient, scale)}</span>
                     </div>
                   ))}
                 </div>
