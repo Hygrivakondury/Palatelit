@@ -263,7 +263,7 @@ export default function HomePage() {
                   )}
                 </div>
                 <DropdownMenuItem
-                  className="gap-2 cursor-pointer"
+                  className="gap-2 cursor-pointer text-foreground focus:text-foreground"
                   onClick={() => { setActiveTab("recipes"); setShowFavoritesOnly((v) => !v); }}
                   data-testid="menu-item-favorites"
                 >
@@ -275,7 +275,7 @@ export default function HomePage() {
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="gap-2 cursor-pointer"
+                  className="gap-2 cursor-pointer text-foreground focus:text-foreground"
                   onClick={() => setShowFeedbackDialog(true)}
                   data-testid="menu-item-feedback"
                 >
