@@ -8,7 +8,7 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Backend**: Express.js (TypeScript)
 - **Database**: PostgreSQL with Drizzle ORM
 - **Auth**: Replit Auth (OpenID Connect)
-- **File Uploads**: Multer (dish photos stored in /uploads/)
+- **File Uploads**: Multer (uploaded photos immediately converted to base64 and stored in PostgreSQL)
 
 ## Key Features
 
@@ -21,7 +21,7 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Reviews & Ratings**: Logged-in users can post star-rated reviews; displayed in recipe detail
 - **227-Recipe Library**: 227 authentic Indian vegetarian recipes across three sub-categories: 88 main dishes, 89 desserts & sweets, 50 mocktails & juices — spanning 8+ regional cuisines with complete ingredients, step-by-step instructions, prep/cook times, servings, and dietary tags
 - **Recipe Sub-Tabs**: The Recipes tab has three sub-tabs — "Dishes" (main category), "Desserts & Sweets" (desserts category), "Mocktails & Juices" (mocktail category). Switching sub-tabs resets all filters; each sub-tab has contextual search placeholder and page heading
-- **Dish Photos**: Every recipe has a matching stock food photograph (stored in `attached_assets/stock_images/`, served at `/stock-images/`); AI-generated photos also supported via `gpt-image-1` which now persists images to `/uploads/` and updates DB
+- **Dish Photos**: Every recipe has a matching stock food photograph (stored in `attached_assets/stock_images/`, served at `/stock-images/`); AI-generated photos stored as base64 in PostgreSQL `image_data` column and served via `/api/recipes/:id/image` — fully persistent across deployments and restarts. Legacy `/uploads/` file-based images auto-migrated to DB on startup.
 - **YouTube Links**: Every recipe has a `youtubeUrl` field linking to the YouTube search results for that recipe; shown as a red "Watch recipe video on YouTube" button in the recipe detail modal
 - **Image Upload**: Users can upload a dish photo (JPEG/PNG/WebP, max 5MB) to any recipe
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities

@@ -80,11 +80,11 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     const b64 = imageResponse.data[0]?.b64_json;
     if (!b64) throw new Error("No image data returned");
 
-    const filename = `recipe_${id}_${Date.now()}.png`;
-    const filepath = path.join(uploadDir, filename);
-    fs.writeFileSync(filepath, Buffer.from(b64, "base64"));
-    await storage.updateRecipeImage(id, `/uploads/${filename}`);
-    console.log(`[image] Auto-generated image for recipe ${id} (${title})`);
+    // Store raw base64 in imageData column, serve through a dedicated route.
+    // This keeps list API payloads small while making images fully persistent in the DB.
+    const imageUrl = `/api/recipes/${id}/image`;
+    await storage.updateRecipeImage(id, imageUrl, b64);
+    console.log(`[image] Auto-generated image for recipe ${id} (${title}) — saved to DB`);
   } catch (err) {
     console.error(`[image] Failed to auto-generate image for recipe ${id}:`, err);
   }
@@ -148,7 +148,29 @@ Return ONLY the JSON, no extra text.`,
 async function migrateUserRecipeImages(): Promise<void> {
   try {
     const allRecipes = await storage.getRecipes();
-    // Find user-submitted recipes with null or broken stock-image URLs
+
+    // 1. Migrate legacy file-based /uploads/ images to DB (if the file exists on disk)
+    const legacyFileRecipes = allRecipes.filter(r => r.imageUrl?.startsWith("/uploads/"));
+    let migrated = 0;
+    for (const recipe of legacyFileRecipes) {
+      try {
+        const filepath = path.join(uploadDir, path.basename(recipe.imageUrl!));
+        if (fs.existsSync(filepath)) {
+          const b64 = fs.readFileSync(filepath).toString("base64");
+          const newImageUrl = `/api/recipes/${recipe.id}/image`;
+          await storage.updateRecipeImage(recipe.id, newImageUrl, b64);
+          fs.unlinkSync(filepath); // clean up file — image now lives in DB
+          migrated++;
+        }
+      } catch (e) {
+        console.error(`[image] Failed to migrate legacy image for recipe ${recipe.id}:`, e);
+      }
+    }
+    if (migrated > 0) {
+      console.log(`[image] Migrated ${migrated} legacy file-based image(s) to DB storage`);
+    }
+
+    // 2. Generate AI images for user-submitted recipes with no image at all
     const needsImage = allRecipes.filter(
       (r) => r.isUserSubmitted && (!r.imageUrl || r.imageUrl.startsWith("/stock-images/"))
     );
@@ -268,12 +290,35 @@ export async function registerRoutes(
     }
   });
 
+  // Public image endpoint — serves recipe image PNG from the imageData DB column.
+  // No auth required; images are public. Works across all deployments (no filesystem dependency).
+  app.get("/api/recipes/:id/image", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recipe = await storage.getRecipe(id);
+      if (!recipe) return res.status(404).send("Not found");
+
+      const imageData = recipe.imageData;
+      if (!imageData) return res.status(404).send("No image");
+
+      const buffer = Buffer.from(imageData, "base64");
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).send("Error");
+    }
+  });
+
   app.post("/api/recipes/:id/image", isAuthenticated, upload.single("image"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const imageUrl = `/uploads/${req.file.filename}`;
-      const updated = await storage.updateRecipeImage(id, imageUrl);
+      // Convert uploaded file to base64, store in imageData column, serve via dedicated route
+      const b64 = fs.readFileSync(req.file.path).toString("base64");
+      fs.unlinkSync(req.file.path); // clean up — image lives in DB now
+      const imageUrl = `/api/recipes/${id}/image`;
+      const updated = await storage.updateRecipeImage(id, imageUrl, b64);
       if (!updated) return res.status(404).json({ message: "Recipe not found" });
       res.json(updated);
     } catch (err) {
@@ -922,11 +967,9 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       const b64 = imageResponse.data[0]?.b64_json;
       if (!b64) return res.status(500).json({ message: "No image returned" });
 
-      const filename = `recipe_${id}_${Date.now()}.png`;
-      const filepath = path.join(uploadDir, filename);
-      fs.writeFileSync(filepath, Buffer.from(b64, "base64"));
-      const imageUrl = `/uploads/${filename}`;
-      await storage.updateRecipeImage(id, imageUrl);
+      // Store raw base64 in imageData column, serve through dedicated route
+      const imageUrl = `/api/recipes/${id}/image`;
+      await storage.updateRecipeImage(id, imageUrl, b64);
 
       res.json({ imageUrl, b64_json: b64, mimeType: "image/png" });
     } catch (err) {
@@ -942,8 +985,16 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
         return res.status(403).json({ message: "Admin only" });
       }
       const all = await storage.getRecipes("", "", "");
-      const missing = all.filter(r => !r.imageUrl);
-      console.log(`[admin] Generating images for ${missing.length} recipes without pictures`);
+      // Regenerate if: no image, OR imageUrl points to a local file that no longer exists (legacy /uploads/ path)
+      const missing = all.filter(r => {
+        if (!r.imageUrl) return true;
+        if (r.imageUrl.startsWith("/uploads/")) {
+          const filepath = path.join(uploadDir, path.basename(r.imageUrl));
+          return !fs.existsSync(filepath);
+        }
+        return false; // data URLs and external URLs are fine
+      });
+      console.log(`[admin] Generating images for ${missing.length} recipes without valid pictures`);
       res.json({ triggered: missing.length });
       for (const r of missing) {
         await generateAndSaveRecipeImage(r.id, r.title);
@@ -961,15 +1012,48 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
         return res.status(403).json({ message: "Admin only" });
       }
       const all = await storage.getRecipes("", "", "");
-      const withImages = all.filter(r => r.imageUrl && r.imageUrl.startsWith("/uploads/"));
+      // Scan any recipe that has an image URL
+      const withImages = all.filter(r => r.imageUrl && r.imageUrl.length > 0);
       res.json({ scanning: withImages.length, message: "Scan started in background" });
 
       let mismatched = 0;
       for (const recipe of withImages) {
         try {
-          const filepath = path.join(uploadDir, path.basename(recipe.imageUrl!));
-          if (!fs.existsSync(filepath)) { await generateAndSaveRecipeImage(recipe.id, recipe.title); mismatched++; continue; }
-          const b64 = fs.readFileSync(filepath).toString("base64");
+          let b64: string;
+          const url = recipe.imageUrl!;
+
+          if (url.startsWith("/api/recipes/")) {
+            // New DB-stored image — fetch imageData directly from DB
+            const imageData = await storage.getRecipeImageData(recipe.id);
+            if (!imageData) {
+              await generateAndSaveRecipeImage(recipe.id, recipe.title);
+              mismatched++;
+              continue;
+            }
+            b64 = imageData;
+          } else if (url.startsWith("data:")) {
+            // Legacy data URL — extract base64 after the comma
+            b64 = url.split(",")[1] ?? "";
+          } else if (url.startsWith("/uploads/")) {
+            // Legacy file-based — read from disk if it exists, else regenerate
+            const filepath = path.join(uploadDir, path.basename(url));
+            if (!fs.existsSync(filepath)) {
+              await generateAndSaveRecipeImage(recipe.id, recipe.title);
+              mismatched++;
+              continue;
+            }
+            b64 = fs.readFileSync(filepath).toString("base64");
+          } else {
+            // External URL or stock image — skip
+            continue;
+          }
+
+          if (!b64) {
+            await generateAndSaveRecipeImage(recipe.id, recipe.title);
+            mismatched++;
+            continue;
+          }
+
           const check = await openai.chat.completions.create({
             model: "gpt-4o",
             max_tokens: 20,
@@ -1003,7 +1087,7 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
       const all = await storage.getRecipes("", "", "");
       const total = all.length;
-      const withImage = all.filter(r => r.imageUrl && r.imageUrl.startsWith("/uploads/")).length;
+      const withImage = all.filter(r => r.imageUrl && r.imageUrl.length > 0).length;
       const noImage = all.filter(r => !r.imageUrl).length;
       res.json({ total, withImage, noImage });
     } catch (err) {

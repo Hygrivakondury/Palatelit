@@ -6,15 +6,19 @@ import {
   type UserFeedback,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc, getTableColumns } from "drizzle-orm";
+
+// Column selection for list queries — omits the large imageData blob so API responses stay small
+const { imageData: _imageDataCol, ...recipeListColumns } = getTableColumns(recipes);
 
 export interface IStorage {
   getRecipes(search?: string, cuisine?: string, category?: string): Promise<Recipe[]>;
   getUserRecipes(userId: string): Promise<Recipe[]>;
   getCommunityRecipes(): Promise<Recipe[]>;
   getRecipe(id: number): Promise<Recipe | undefined>;
+  getRecipeImageData(id: number): Promise<string | null>;
   createRecipe(recipe: Partial<InsertRecipe>): Promise<Recipe>;
-  updateRecipeImage(id: number, imageUrl: string): Promise<Recipe | undefined>;
+  updateRecipeImage(id: number, imageUrl: string, imageData?: string): Promise<Recipe | undefined>;
   recipeCount(): Promise<number>;
   // Favorites
   getFavoritesByUser(userId: string): Promise<Favorite[]>;
@@ -102,30 +106,37 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Always exclude the large imageData blob from list responses to keep API payloads small
     if (conditions.length === 0) {
-      return db.select().from(recipes).orderBy(recipes.id);
+      return db.select(recipeListColumns).from(recipes).orderBy(recipes.id) as unknown as Recipe[];
     } else if (conditions.length === 1) {
-      return db.select().from(recipes).where(conditions[0]).orderBy(recipes.id);
+      return db.select(recipeListColumns).from(recipes).where(conditions[0]).orderBy(recipes.id) as unknown as Recipe[];
     } else {
-      return db.select().from(recipes).where(and(...conditions)).orderBy(recipes.id);
+      return db.select(recipeListColumns).from(recipes).where(and(...conditions)).orderBy(recipes.id) as unknown as Recipe[];
     }
   }
 
   async getUserRecipes(userId: string): Promise<Recipe[]> {
-    return db.select().from(recipes)
+    return db.select(recipeListColumns).from(recipes)
       .where(eq(recipes.submittedBy, userId))
-      .orderBy(desc(recipes.createdAt));
+      .orderBy(desc(recipes.createdAt)) as unknown as Recipe[];
   }
 
   async getCommunityRecipes(): Promise<Recipe[]> {
-    return db.select().from(recipes)
+    return db.select(recipeListColumns).from(recipes)
       .where(eq(recipes.isUserSubmitted, true))
-      .orderBy(desc(recipes.createdAt));
+      .orderBy(desc(recipes.createdAt)) as unknown as Recipe[];
   }
 
   async getRecipe(id: number): Promise<Recipe | undefined> {
+    // Full select including imageData for single-recipe detail views
     const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
     return recipe;
+  }
+
+  async getRecipeImageData(id: number): Promise<string | null> {
+    const [row] = await db.select({ imageData: recipes.imageData }).from(recipes).where(eq(recipes.id, id));
+    return row?.imageData ?? null;
   }
 
   async createRecipe(recipe: Partial<InsertRecipe>): Promise<Recipe> {
@@ -133,8 +144,10 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateRecipeImage(id: number, imageUrl: string): Promise<Recipe | undefined> {
-    const [updated] = await db.update(recipes).set({ imageUrl }).where(eq(recipes.id, id)).returning();
+  async updateRecipeImage(id: number, imageUrl: string, imageData?: string): Promise<Recipe | undefined> {
+    const updateData: { imageUrl: string; imageData?: string } = { imageUrl };
+    if (imageData !== undefined) updateData.imageData = imageData;
+    const [updated] = await db.update(recipes).set(updateData).where(eq(recipes.id, id)).returning();
     return updated;
   }
 
