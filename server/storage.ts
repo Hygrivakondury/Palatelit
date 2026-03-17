@@ -1,9 +1,10 @@
 import {
   recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
+  blogPosts, blogComments, adSlots,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
   type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
-  type UserFeedback,
+  type UserFeedback, type BlogPost, type InsertBlogPost, type BlogComment, type AdSlot,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc, getTableColumns } from "drizzle-orm";
@@ -74,6 +75,21 @@ export interface IStorage {
   createFeedback(data: { userEmail: string; userName: string; userProfileImage: string; message: string }): Promise<UserFeedback>;
   getAllFeedback(): Promise<UserFeedback[]>;
   respondToFeedback(id: number, adminResponse: string): Promise<UserFeedback | undefined>;
+  // Blog Posts
+  getBlogPosts(publishedOnly?: boolean): Promise<BlogPost[]>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  getBlogPost(id: number): Promise<BlogPost | undefined>;
+  createBlogPost(data: Partial<InsertBlogPost>): Promise<BlogPost>;
+  updateBlogPost(id: number, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: number): Promise<void>;
+  // Blog Comments
+  getCommentsByPost(postId: number, approvedOnly?: boolean): Promise<BlogComment[]>;
+  addBlogComment(data: { postId: number; authorId: string; authorName: string | null; authorImageUrl: string | null; content: string }): Promise<BlogComment>;
+  deleteBlogComment(id: number): Promise<void>;
+  approveBlogComment(id: number): Promise<void>;
+  // Ad Slots
+  getAdSlots(): Promise<AdSlot[]>;
+  upsertAdSlot(slotName: string, data: Partial<Omit<AdSlot, "id" | "slotName">>, updatedBy: string): Promise<AdSlot>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -473,6 +489,103 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(affiliateLinks)
       .set({ ...data, updatedAt: new Date(), updatedBy })
       .where(eq(affiliateLinks.slot, slot))
+      .returning();
+    return updated;
+  }
+
+  // ─── BLOG POSTS ──────────────────────────────────────────────────────────
+
+  async getBlogPosts(publishedOnly = false): Promise<BlogPost[]> {
+    if (publishedOnly) {
+      return db.select().from(blogPosts)
+        .where(eq(blogPosts.isPublished, true))
+        .orderBy(desc(blogPosts.publishedAt));
+    }
+    return db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt));
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug));
+    return post;
+  }
+
+  async getBlogPost(id: number): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async createBlogPost(data: Partial<InsertBlogPost>): Promise<BlogPost> {
+    const [post] = await db.insert(blogPosts).values(data as InsertBlogPost).returning();
+    return post;
+  }
+
+  async updateBlogPost(id: number, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const [updated] = await db.update(blogPosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBlogPost(id: number): Promise<void> {
+    await db.delete(blogComments).where(eq(blogComments.postId, id));
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  // ─── BLOG COMMENTS ────────────────────────────────────────────────────────
+
+  async getCommentsByPost(postId: number, approvedOnly = true): Promise<BlogComment[]> {
+    if (approvedOnly) {
+      return db.select().from(blogComments)
+        .where(and(eq(blogComments.postId, postId), eq(blogComments.isApproved, true)))
+        .orderBy(blogComments.createdAt);
+    }
+    return db.select().from(blogComments)
+      .where(eq(blogComments.postId, postId))
+      .orderBy(blogComments.createdAt);
+  }
+
+  async addBlogComment(data: { postId: number; authorId: string; authorName: string | null; authorImageUrl: string | null; content: string }): Promise<BlogComment> {
+    const [comment] = await db.insert(blogComments).values({
+      postId: data.postId,
+      authorId: data.authorId,
+      authorName: data.authorName,
+      authorImageUrl: data.authorImageUrl,
+      content: data.content,
+      isApproved: true,
+    }).returning();
+    return comment;
+  }
+
+  async deleteBlogComment(id: number): Promise<void> {
+    await db.delete(blogComments).where(eq(blogComments.id, id));
+  }
+
+  async approveBlogComment(id: number): Promise<void> {
+    await db.update(blogComments).set({ isApproved: true }).where(eq(blogComments.id, id));
+  }
+
+  // ─── AD SLOTS ────────────────────────────────────────────────────────────
+
+  async getAdSlots(): Promise<AdSlot[]> {
+    return db.select().from(adSlots);
+  }
+
+  async upsertAdSlot(slotName: string, data: Partial<Omit<AdSlot, "id" | "slotName">>, updatedBy: string): Promise<AdSlot> {
+    const existing = await db.select().from(adSlots).where(eq(adSlots.slotName, slotName)).limit(1);
+    if (existing.length === 0) {
+      const [created] = await db.insert(adSlots).values({
+        slotName,
+        label: data.label ?? slotName,
+        htmlCode: data.htmlCode ?? "",
+        isActive: data.isActive ?? false,
+        updatedBy,
+      }).returning();
+      return created;
+    }
+    const [updated] = await db.update(adSlots)
+      .set({ ...data, updatedAt: new Date(), updatedBy })
+      .where(eq(adSlots.slotName, slotName))
       .returning();
     return updated;
   }

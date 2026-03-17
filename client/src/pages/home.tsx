@@ -18,17 +18,18 @@ import { CommunityTab } from "@/components/community-tab";
 import { WeeklyChallengeTab } from "@/components/weekly-challenge-tab";
 import { PantryGenieTab } from "@/components/pantry-genie-tab";
 import { MealPlanTab } from "@/components/meal-plan-tab";
+import { BlogTab } from "@/components/blog-tab";
 import {
   Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
-  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight
+  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight, PenSquare,
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
 import { CUISINE_TYPES } from "@shared/schema";
 
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
-type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan";
+type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan" | "blog";
 
 type RecipeSubTab = "main" | "dessert" | "mocktail";
 
@@ -170,6 +171,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "challenge", label: "Weekly Challenge", icon: <Trophy size={16} /> },
   { id: "pantry", label: "Pantry", icon: <ShoppingBag size={16} /> },
   { id: "mealplan", label: "Meal Plan", icon: <CalendarDays size={16} /> },
+  { id: "blog", label: "Blog", icon: <PenSquare size={16} /> },
 ];
 
 const RECIPE_SUB_TABS: { id: RecipeSubTab; label: string; icon: React.ReactNode; placeholder: string; emptyLabel: string; tagline: string }[] = [
@@ -691,6 +693,10 @@ export default function HomePage() {
             setActiveTab("recipes");
           }}
         />
+      )}
+
+      {activeTab === "blog" && (
+        <BlogTab isAdmin={myProfile?.isAdmin ?? false} />
       )}
 
       <SmartChefChat

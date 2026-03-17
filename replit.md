@@ -27,7 +27,8 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Smart Scaling**: Servings multiplier in recipe modal (0.5×–4×) auto-scales all ingredient quantities
 - **Smart Chef AI**: Floating AI chat assistant (bottom-right) powered by OpenAI GPT-4o-mini via Replit AI Integrations — strictly vegetarian/vegan advice, Indian cuisine expertise, streaming responses, recipe-context aware
 - **Smart Commerce**: Affiliate link layer on every recipe — "Get Ingredients Fast" section with 3 configurable slots (Amazon, Blinkit, Flipkart); intelligent deep-linking opens native app if installed, falls back to browser URL; affiliate disclosure text auto-shown; admin-only `/admin` page to manage all links
-- **Tab Navigation**: Five-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie / Meal Plan) with desktop tab bar + mobile bottom navigation bar
+- **Tab Navigation**: Six-tab layout (Recipes / Community / Weekly Challenge / Pantry Genie / Meal Plan / Blog) with desktop tab bar + mobile bottom navigation bar
+- **Food Blog**: Full editorial blog with markdown-rendered posts; tags, excerpt, cover images (base64 stored in DB), read-time estimates; reader comments (requires Replit Auth); ad slot renderer for monetization
 - **Meal Plan**: Full weekly meal planning tab with:
   - **Smartfill Plan**: One-click auto-fills all 7 days with 2 randomly shuffled recipes per day from the library
   - **Clear Week**: Wipes all 7 days at once with one button
@@ -45,7 +46,9 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Community Recipes**: Dedicated Community tab showing all user-submitted recipes with author info; each card has View (opens recipe modal) and Chat buttons
 - **Community Chat**: Per-recipe chat window where users can message the recipe author and other cooks
 - **User Recipe Library**: Submitted recipes appear in both the global recipe library and the submitter's personal library
-- **Admin System**: Two hardcoded admin emails enforced server-side; no self-claim possible; admin badge shown in user menu
+- **Admin System**: Two hardcoded admin emails (`genieflavour@gmail.com`, `gurumurthy.sastry@gmail.com`) enforced server-side; 7-tab admin panel: Recipes, Community, Commerce, Feedback, Images, Blog Posts, Monetize (Ad Slots)
+- **Blog Admin**: Create/edit/delete blog posts with markdown editor, publish/unpublish toggle, tag support, excerpt management
+- **Ad Slot Monetization**: 4 configurable ad slots (blog_banner_top, blog_inline, blog_banner_bottom, recipe_sidebar) — paste any ad HTML/JS snippet, toggle active/inactive per slot
 - **Green & Gold theme**: Professional, elegant design using Open Sans + Lora fonts
 
 ## Project Structure

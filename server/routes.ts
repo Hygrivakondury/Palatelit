@@ -1286,5 +1286,168 @@ Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet 
   // Background: fix any existing user-submitted recipes with missing/broken images
   migrateUserRecipeImages();
 
+  // ─── BLOG POSTS ─────────────────────────────────────────────────
+  // Public: list published posts (no auth needed)
+  app.get("/api/blog", async (req: any, res) => {
+    try {
+      const adminMode = req.query.admin === "1" && isAdminEmail(req.user?.claims?.email);
+      const posts = await storage.getBlogPosts(!adminMode);
+      // Strip coverImageData from list to keep payload small
+      res.json(posts.map(p => ({ ...p, coverImageData: p.coverImageData ? "has_image" : null })));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch posts" });
+    }
+  });
+
+  app.get("/api/blog/:slug", async (_req, res) => {
+    try {
+      const post = await storage.getBlogPostBySlug(_req.params.slug);
+      if (!post) return res.status(404).json({ message: "Post not found" });
+      if (!post.isPublished) {
+        const email = (_req as any).user?.claims?.email;
+        if (!isAdminEmail(email)) return res.status(404).json({ message: "Post not found" });
+      }
+      res.json(post);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch post" });
+    }
+  });
+
+  app.post("/api/blog", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const { title, excerpt, content, coverImageData, isPublished, readTimeMinutes, tags } = req.body;
+      if (!title?.trim()) return res.status(400).json({ message: "Title required" });
+      const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now();
+      const post = await storage.createBlogPost({
+        slug,
+        title: title.trim(),
+        excerpt: excerpt?.trim() || "",
+        content: content?.trim() || "",
+        coverImageData: coverImageData || null,
+        authorId: req.user.claims.sub,
+        authorName: req.user.claims.first_name ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim() : "Admin",
+        isPublished: !!isPublished,
+        publishedAt: isPublished ? new Date() : undefined,
+        readTimeMinutes: readTimeMinutes || Math.max(1, Math.ceil((content || "").split(/\s+/).length / 200)),
+        tags: Array.isArray(tags) ? tags : [],
+      });
+      res.status(201).json(post);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create post" });
+    }
+  });
+
+  app.patch("/api/blog/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const id = parseInt(req.params.id);
+      const existing = await storage.getBlogPost(id);
+      if (!existing) return res.status(404).json({ message: "Post not found" });
+      const { title, excerpt, content, coverImageData, isPublished, readTimeMinutes, tags } = req.body;
+      const wasPublished = existing.isPublished;
+      const nowPublished = isPublished ?? existing.isPublished;
+      const updated = await storage.updateBlogPost(id, {
+        ...(title !== undefined && { title: title.trim(), slug: title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + existing.id }),
+        ...(excerpt !== undefined && { excerpt: excerpt.trim() }),
+        ...(content !== undefined && { content: content.trim(), readTimeMinutes: readTimeMinutes ?? Math.max(1, Math.ceil(content.split(/\s+/).length / 200)) }),
+        ...(coverImageData !== undefined && { coverImageData }),
+        ...(tags !== undefined && { tags }),
+        isPublished: nowPublished,
+        publishedAt: nowPublished && !wasPublished ? new Date() : existing.publishedAt ?? undefined,
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update post" });
+    }
+  });
+
+  app.delete("/api/blog/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      await storage.deleteBlogPost(parseInt(req.params.id));
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete post" });
+    }
+  });
+
+  // ─── BLOG COMMENTS ──────────────────────────────────────────────
+  app.get("/api/blog/:postId/comments", async (req: any, res) => {
+    try {
+      const postId = parseInt(req.params.postId);
+      const adminMode = isAdminEmail(req.user?.claims?.email);
+      const comments = await storage.getCommentsByPost(postId, !adminMode);
+      res.json(comments);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  app.post("/api/blog/:postId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const postId = parseInt(req.params.postId);
+      const post = await storage.getBlogPost(postId);
+      if (!post || !post.isPublished) return res.status(404).json({ message: "Post not found" });
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Comment content required" });
+      const comment = await storage.addBlogComment({
+        postId,
+        authorId: req.user.claims.sub,
+        authorName: req.user.claims.first_name ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim() : null,
+        authorImageUrl: req.user.claims.profile_image_url ?? null,
+        content: content.trim(),
+      });
+      res.status(201).json(comment);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to post comment" });
+    }
+  });
+
+  app.delete("/api/blog/comments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      await storage.deleteBlogComment(parseInt(req.params.id));
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete comment" });
+    }
+  });
+
+  // Admin: list all comments across all posts for moderation
+  app.get("/api/admin/blog-comments", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const allPosts = await storage.getBlogPosts(false);
+      const allComments = await Promise.all(allPosts.map(p => storage.getCommentsByPost(p.id, false)));
+      const flat = allComments.flat().sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      res.json(flat);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // ─── AD SLOTS ───────────────────────────────────────────────────
+  app.get("/api/ad-slots", async (_req, res) => {
+    try {
+      const slots = await storage.getAdSlots();
+      res.json(slots);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch ad slots" });
+    }
+  });
+
+  app.put("/api/ad-slots/:slotName", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const { slotName } = req.params;
+      const { label, htmlCode, isActive } = req.body;
+      const updated = await storage.upsertAdSlot(slotName, { label, htmlCode, isActive }, req.user.claims.email);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update ad slot" });
+    }
+  });
+
   return httpServer;
 }

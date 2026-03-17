@@ -296,3 +296,66 @@ export const insertFeedbackSchema = createInsertSchema(userFeedback).omit({
 
 export type UserFeedback = typeof userFeedback.$inferSelect;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+
+// ─── BLOG ──────────────────────────────────────────────────────────────────
+
+export const blogPosts = pgTable("blog_posts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slug: varchar("slug", { length: 200 }).notNull().unique(),
+  title: text("title").notNull(),
+  excerpt: text("excerpt").notNull().default(""),
+  content: text("content").notNull().default(""),
+  coverImageData: text("cover_image_data"),
+  authorId: varchar("author_id").notNull(),
+  authorName: text("author_name").notNull().default("Admin"),
+  isPublished: boolean("is_published").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  readTimeMinutes: integer("read_time_minutes").notNull().default(5),
+  tags: text("tags").array().notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+
+export const blogComments = pgTable("blog_comments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  postId: integer("post_id").notNull(),
+  authorId: varchar("author_id").notNull(),
+  authorName: text("author_name"),
+  authorImageUrl: text("author_image_url"),
+  content: text("content").notNull(),
+  isApproved: boolean("is_approved").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBlogCommentSchema = createInsertSchema(blogComments).omit({
+  id: true,
+  isApproved: true,
+  createdAt: true,
+});
+
+export type BlogComment = typeof blogComments.$inferSelect;
+export type InsertBlogComment = z.infer<typeof insertBlogCommentSchema>;
+
+export const adSlots = pgTable("ad_slots", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slotName: varchar("slot_name", { length: 50 }).notNull().unique(),
+  label: text("label").notNull().default(""),
+  htmlCode: text("html_code").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by"),
+});
+
+export type AdSlot = typeof adSlots.$inferSelect;
+
+export const AD_SLOT_NAMES = ["blog_banner_top", "blog_inline", "blog_banner_bottom", "recipe_sidebar"] as const;
+export type AdSlotName = typeof AD_SLOT_NAMES[number];

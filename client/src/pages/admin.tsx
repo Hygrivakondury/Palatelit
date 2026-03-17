@@ -12,16 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch,
   MessageSquare, Send, ChevronDown, ChevronUp, UtensilsCrossed, Users,
-  Plus, X, Pencil, Trash2, Search, CheckCircle2, ChefHat
+  Plus, X, Pencil, Trash2, Search, CheckCircle2, ChefHat, PenSquare, Eye, EyeOff, DollarSign,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import type { AffiliateLink, UserFeedback, Recipe } from "@shared/schema";
-import { CUISINE_TYPES, DIETARY_TAGS } from "@shared/schema";
+import type { AffiliateLink, UserFeedback, Recipe, BlogPost, AdSlot } from "@shared/schema";
+import { CUISINE_TYPES, DIETARY_TAGS, AD_SLOT_NAMES } from "@shared/schema";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
-type AdminTab = "recipes" | "community" | "commerce" | "feedback" | "images";
+type AdminTab = "recipes" | "community" | "commerce" | "feedback" | "images" | "blog" | "monetize";
 
 const SLOT_META: Record<string, { emoji: string; color: string; bgColor: string }> = {
   amazon: { emoji: "🛒", color: "text-orange-700", bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800" },
@@ -724,13 +724,296 @@ function FeedbackSection() {
   );
 }
 
-// ─── MAIN ADMIN PAGE ───────────────────────────────────────────────────────
+// ─── BLOG MANAGEMENT SECTION ───────────────────────────────────────────────
+function BlogManagementSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState<BlogPost | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ title: "", excerpt: "", content: "", tags: "", isPublished: false });
+
+  const { data: posts = [], isLoading } = useQuery<BlogPost[]>({
+    queryKey: ["/api/blog", "admin"],
+    queryFn: () => fetch("/api/blog?admin=1").then(r => r.json()),
+  });
+
+  const resetForm = () => setForm({ title: "", excerpt: "", content: "", tags: "", isPublished: false });
+
+  const startCreate = () => { resetForm(); setEditing(null); setCreating(true); };
+  const startEdit = (p: BlogPost) => {
+    setForm({ title: p.title, excerpt: p.excerpt ?? "", content: p.content ?? "", tags: (p.tags ?? []).join(", "), isPublished: p.isPublished ?? false });
+    setCreating(false);
+    setEditing(p);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        title: form.title.trim(),
+        excerpt: form.excerpt.trim(),
+        content: form.content.trim(),
+        tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+        isPublished: form.isPublished,
+      };
+      if (creating) return apiRequest("POST", "/api/blog", payload);
+      return apiRequest("PATCH", `/api/blog/${editing!.id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
+      setEditing(null); setCreating(false); resetForm();
+      toast({ title: creating ? "Post created!" : "Post updated!" });
+    },
+    onError: () => toast({ title: "Failed to save post", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/blog/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
+      toast({ title: "Post deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete post", variant: "destructive" }),
+  });
+
+  const togglePublish = useMutation({
+    mutationFn: ({ id, current }: { id: number; current: boolean }) =>
+      apiRequest("PATCH", `/api/blog/${id}`, { isPublished: !current }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/blog"] }),
+    onError: () => toast({ title: "Failed to toggle publish", variant: "destructive" }),
+  });
+
+  const isEditorOpen = creating || !!editing;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold font-serif text-foreground">Blog Posts</h2>
+        <Button onClick={startCreate} className="gap-2" size="sm" data-testid="button-create-post">
+          <Plus className="w-4 h-4" /> New Post
+        </Button>
+      </div>
+
+      {isEditorOpen && (
+        <div className="rounded-xl border bg-card p-5 space-y-4">
+          <h3 className="font-semibold text-foreground">{creating ? "Create New Post" : `Edit: ${editing?.title}`}</h3>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Title *</Label>
+              <Input
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Post title"
+                data-testid="input-post-title"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Excerpt</Label>
+              <Input
+                value={form.excerpt}
+                onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
+                placeholder="Short description shown on card"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Tags (comma-separated)</Label>
+              <Input
+                value={form.tags}
+                onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                placeholder="e.g. South Indian, Tips, Seasonal"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Content (Markdown)</Label>
+              <Textarea
+                value={form.content}
+                onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
+                placeholder="Write your post content in Markdown…"
+                rows={14}
+                className="font-mono text-xs resize-y"
+                data-testid="input-post-content"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.isPublished}
+                onCheckedChange={v => setForm(f => ({ ...f, isPublished: v }))}
+                id="publish-toggle"
+              />
+              <Label htmlFor="publish-toggle" className="text-sm cursor-pointer">
+                {form.isPublished ? "Published" : "Draft (not visible to public)"}
+              </Label>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={!form.title.trim() || saveMutation.isPending}
+              className="gap-2"
+              data-testid="button-save-post"
+            >
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saveMutation.isPending ? "Saving…" : "Save Post"}
+            </Button>
+            <Button variant="outline" onClick={() => { setEditing(null); setCreating(false); }}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}</div>
+      ) : posts.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <PenSquare className="w-10 h-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm">No posts yet. Click "New Post" to start writing.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {posts.map(post => (
+            <div key={post.id} className="rounded-xl border bg-card p-4 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-foreground truncate text-sm">{post.title}</p>
+                  <Badge variant={post.isPublished ? "default" : "secondary"} className="text-[10px]">
+                    {post.isPublished ? "Published" : "Draft"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{post.excerpt}</p>
+                {post.publishedAt && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {new Date(post.publishedAt).toLocaleDateString("en-IN")}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => togglePublish.mutate({ id: post.id, current: post.isPublished ?? false })}
+                  title={post.isPublished ? "Unpublish" : "Publish"}
+                  className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                >
+                  {post.isPublished ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                </button>
+                <Button variant="outline" size="sm" onClick={() => startEdit(post)} className="h-8 px-2 gap-1">
+                  <Pencil className="w-3 h-3" /> Edit
+                </Button>
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => { if (confirm(`Delete "${post.title}"?`)) deleteMutation.mutate(post.id); }}
+                  className="h-8 px-2 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MONETIZE SECTION ──────────────────────────────────────────────────────
+const AD_SLOT_LABELS: Record<string, string> = {
+  blog_banner_top: "Blog — Top Banner",
+  blog_inline: "Blog — Inline (mid-article)",
+  blog_banner_bottom: "Blog — Bottom Banner",
+  recipe_sidebar: "Recipes — Sidebar",
+};
+
+function MonetizeSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: slots = [], isLoading } = useQuery<AdSlot[]>({ queryKey: ["/api/ad-slots"] });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ slotName, data }: { slotName: string; data: Partial<AdSlot> }) =>
+      apiRequest("PUT", `/api/ad-slots/${slotName}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/ad-slots"] }); toast({ title: "Ad slot saved" }); },
+    onError: () => toast({ title: "Failed to save ad slot", variant: "destructive" }),
+  });
+
+  const [drafts, setDrafts] = useState<Record<string, { htmlCode: string; isActive: boolean }>>({});
+
+  const getDraft = (slotName: string, field: "htmlCode" | "isActive", fallback: string | boolean) => {
+    if (drafts[slotName] !== undefined && (drafts[slotName] as any)[field] !== undefined) return (drafts[slotName] as any)[field];
+    return fallback;
+  };
+
+  const setDraft = (slotName: string, field: "htmlCode" | "isActive", value: string | boolean) => {
+    setDrafts(prev => {
+      const existing = prev[slotName] ?? { htmlCode: "", isActive: false };
+      return { ...prev, [slotName]: { ...existing, [field]: value } };
+    });
+  };
+
+  const slotMap = Object.fromEntries(slots.map(s => [s.slotName, s]));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-bold font-serif text-foreground">Ad Slot Monetization</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Paste any ad network HTML/JS snippet into a slot. Toggle each slot on/off. Active slots render live on the blog.
+        </p>
+      </div>
+      {isLoading ? (
+        <div className="space-y-4">{[1, 2, 3, 4].map(i => <div key={i} className="h-40 rounded-xl bg-muted animate-pulse" />)}</div>
+      ) : (
+        <div className="space-y-5">
+          {AD_SLOT_NAMES.map(slotName => {
+            const slot = slotMap[slotName];
+            const htmlCode = getDraft(slotName, "htmlCode", slot?.htmlCode ?? "") as string;
+            const isActive = getDraft(slotName, "isActive", slot?.isActive ?? false) as boolean;
+            return (
+              <div key={slotName} className="rounded-xl border bg-card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">{AD_SLOT_LABELS[slotName] ?? slotName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{slotName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={isActive}
+                      onCheckedChange={v => setDraft(slotName, "isActive", v)}
+                      id={`slot-active-${slotName}`}
+                    />
+                    <Label htmlFor={`slot-active-${slotName}`} className="text-xs text-muted-foreground">
+                      {isActive ? "Active" : "Inactive"}
+                    </Label>
+                  </div>
+                </div>
+                <Textarea
+                  value={htmlCode}
+                  onChange={e => setDraft(slotName, "htmlCode", e.target.value)}
+                  placeholder="Paste ad HTML/script here (e.g. Google AdSense snippet)…"
+                  rows={5}
+                  className="font-mono text-xs resize-y"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => updateMutation.mutate({ slotName, data: { htmlCode, isActive, label: AD_SLOT_LABELS[slotName] ?? slotName } })}
+                  disabled={updateMutation.isPending}
+                  className="gap-2"
+                >
+                  {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save Slot
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={15} />, desc: "Create, edit, delete any recipe" },
   { id: "community", label: "Community", icon: <Users size={15} />, desc: "Moderate messages" },
   { id: "commerce", label: "Commerce", icon: <ShoppingBag size={15} />, desc: "Affiliate link slots" },
   { id: "feedback", label: "Feedback", icon: <MessageSquare size={15} />, desc: "Reply to users" },
   { id: "images", label: "Images", icon: <ImageIcon size={15} />, desc: "Generate & fix AI images" },
+  { id: "blog", label: "Blog Posts", icon: <PenSquare size={15} />, desc: "Write & manage blog posts" },
+  { id: "monetize", label: "Monetize", icon: <DollarSign size={15} />, desc: "Ad slot configuration" },
 ];
 
 export default function AdminPage() {
@@ -851,6 +1134,8 @@ export default function AdminPage() {
             )}
             {activeTab === "feedback" && <FeedbackSection />}
             {activeTab === "images" && <ImageManagementSection />}
+            {activeTab === "blog" && <BlogManagementSection />}
+            {activeTab === "monetize" && <MonetizeSection />}
           </main>
         </div>
       </div>
