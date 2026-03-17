@@ -328,7 +328,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-40 bg-white/92 dark:bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
             <img src={logoImg} alt="Palate Lit logo" className="w-7 h-7 rounded-lg object-cover" />
@@ -602,9 +602,9 @@ export default function HomePage() {
           {recipesLoading ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-card border border-card-border rounded-2xl overflow-hidden">
-                  <Skeleton className="w-full h-44" />
-                  <div className="p-4 space-y-3">
+                <div key={i} className="bg-card border border-card-border rounded-xl overflow-hidden shadow-sm">
+                  <Skeleton className="w-full h-52" />
+                  <div className="p-5 space-y-3">
                     <Skeleton className="h-5 w-3/4" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-2/3" />

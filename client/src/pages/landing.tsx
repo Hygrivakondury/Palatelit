@@ -1,174 +1,151 @@
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, ChefHat, Star, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Star, ChefHat, Sparkles, Search } from "lucide-react";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background font-sans">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <img src={logoImg} alt="Palate Lit logo" className="w-8 h-8 rounded-lg object-cover" />
-            <span className="font-serif text-xl font-bold text-foreground tracking-tight">Palate Lit</span>
+            <span className="font-serif text-xl font-bold text-foreground tracking-tight">Palate <strong>Lit</strong></span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a>
             <a href="#cuisines" className="hover:text-foreground transition-colors">Cuisines</a>
-            <a href="#testimonials" className="hover:text-foreground transition-colors">Community</a>
+            <a href="#community" className="hover:text-foreground transition-colors">Community</a>
           </div>
           <a href="/api/login">
-            <Button variant="default" size="sm" data-testid="button-login-nav" className="gap-2">
+            <Button variant="default" size="sm" data-testid="button-login-nav" className="gap-2 font-medium">
               Get Started <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </a>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-24 px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent rounded-full border border-accent-border">
-              <Sparkles className="w-3.5 h-3.5 text-accent-foreground" />
-              <span className="text-xs font-medium text-accent-foreground">100% Vegetarian • Made for India</span>
-            </div>
-            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] tracking-tight">
-              Cook What You Love,
-              <span className="block text-primary"> with What You Have</span>
-            </h1>
-            <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-              Illuminating Flavor. Elevating Mood — Palate Lit finds authentic Indian vegetarian recipes perfectly matched to what's in your kitchen.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <a href="/api/login">
-                <Button size="lg" data-testid="button-get-started-hero" className="gap-2 px-8 h-12 text-base font-medium shadow-lg">
-                  Start Cooking <ArrowRight className="w-4 h-4" />
-                </Button>
-              </a>
-              <a href="#features">
-                <Button size="lg" variant="outline" data-testid="button-learn-more" className="h-12 text-base font-medium px-8">
-                  See How It Works
-                </Button>
-              </a>
-            </div>
-            <div className="flex items-center gap-6 pt-2">
-              <div className="flex -space-x-2">
-                {["🧑‍🍳", "👩‍🍳", "👨‍🍳", "🧑‍🍳"].map((emoji, i) => (
-                  <div key={i} className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-sm">
-                    {emoji}
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">Trusted by 1000s</span> of home cooks
-              </p>
-            </div>
+      {/* Hero — full-width, dark, immersive */}
+      <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-[#1c1410]">
+        {/* Background texture overlay */}
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: `radial-gradient(circle at 30% 50%, hsl(16 72% 48% / 0.4) 0%, transparent 60%), radial-gradient(circle at 75% 20%, hsl(36 80% 55% / 0.25) 0%, transparent 50%)`
+        }} />
+
+        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/8 text-white/70 text-xs font-medium mb-10 tracking-wide uppercase">
+            <Sparkles className="w-3 h-3" />
+            100% Vegetarian · Made for India
           </div>
 
-          {/* Hero Visual */}
-          <div className="relative">
-            <div className="relative bg-card border border-card-border rounded-2xl p-6 shadow-xl">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Search className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Recipe Filter</p>
-                    <p className="text-sm font-medium text-foreground">What's in your kitchen?</p>
-                  </div>
+          <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.04] tracking-tight mb-8">
+            Extraordinary <br />
+            <span style={{ color: "hsl(16 72% 62%)" }}>flavour,</span> on your terms
+          </h1>
+
+          <p className="text-white/60 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-12 font-light">
+            Palate Lit finds authentic Indian vegetarian recipes perfectly matched to what's already in your kitchen — from pantry to plate in under 30 minutes.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+            <a href="/api/login">
+              <Button
+                size="lg"
+                data-testid="button-get-started-hero"
+                className="gap-2 px-10 h-13 text-base font-semibold shadow-xl"
+                style={{ height: "52px", minWidth: "200px" }}
+              >
+                Start Cooking — It's Free <ArrowRight className="w-4 h-4" />
+              </Button>
+            </a>
+            <a href="#how-it-works">
+              <Button
+                size="lg"
+                variant="outline"
+                data-testid="button-learn-more"
+                className="h-13 text-base font-medium px-8 border-white/20 text-white/80 bg-white/5 hover:bg-white/10"
+                style={{ height: "52px" }}
+              >
+                See How It Works
+              </Button>
+            </a>
+          </div>
+
+          {/* Social proof */}
+          <div className="flex items-center justify-center gap-6">
+            <div className="flex -space-x-2">
+              {["🧑‍🍳", "👩‍🍳", "👨‍🍳", "🧑‍🍳", "👩‍🍳"].map((emoji, i) => (
+                <div key={i} className="w-9 h-9 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center text-sm">
+                  {emoji}
                 </div>
-                <div className="bg-background border border-border rounded-xl px-4 py-3 text-sm text-muted-foreground font-mono">
-                  paneer, spinach, tomatoes...
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { title: "Palak Paneer", cuisine: "North Indian", time: "30 min", match: "98%" },
-                    { title: "Paneer Bhurji", cuisine: "Punjabi", time: "20 min", match: "94%" },
-                    { title: "Saag Paneer", cuisine: "North Indian", time: "45 min", match: "91%" },
-                  ].map((recipe, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-background border border-border rounded-xl hover-elevate cursor-pointer">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-lg flex-shrink-0">
-                        {i === 0 ? "🥬" : i === 1 ? "🧀" : "🍃"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{recipe.title}</p>
-                        <p className="text-xs text-muted-foreground">{recipe.cuisine} • {recipe.time}</p>
-                      </div>
-                      <Badge variant="secondary" className="text-xs bg-accent text-accent-foreground border-0 flex-shrink-0">
-                        {recipe.match}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
-            {/* Floating accent cards */}
-            <div className="absolute -top-4 -right-4 bg-accent border border-accent-border rounded-xl px-4 py-2 shadow-lg">
-              <div className="flex items-center gap-2">
-                <Star className="w-3.5 h-3.5 text-accent-foreground fill-accent-foreground" />
-                <span className="text-xs font-semibold text-accent-foreground">100s of Recipes</span>
+            <div className="text-left">
+              <div className="flex gap-0.5 mb-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                ))}
               </div>
-            </div>
-            <div className="absolute -bottom-4 -left-4 bg-primary rounded-xl px-4 py-2 shadow-lg">
-              <span className="text-xs font-semibold text-primary-foreground">11 Cuisine Types</span>
+              <p className="text-white/50 text-xs">Loved by <span className="text-white/80 font-medium">1,000s</span> of home cooks</p>
             </div>
           </div>
         </div>
+
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 px-6 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">How It Works</Badge>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground">Simple. Delicious. Indian.</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Three steps from pantry to plate.</p>
+      {/* Three pillars — SimplyCook style */}
+      <section id="how-it-works" className="py-28 px-6 bg-background">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-20">
+            <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">How It Works</p>
+            <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground">Simple. Delicious. <em>Indian.</em></h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-12">
             {[
               {
-                icon: <Search className="w-6 h-6 text-primary" />,
+                icon: <Search className="w-7 h-7 text-primary" />,
                 step: "01",
-                title: "Enter Your Ingredients",
-                desc: "Type in what you have — paneer, dal, vegetables, spices. The Recipe Filter understands natural language.",
+                title: "Tell us what you have",
+                desc: "Type the ingredients sitting in your fridge or pantry — paneer, dal, vegetables, spices. Our smart filter understands natural language.",
               },
               {
-                icon: <Sparkles className="w-6 h-6 text-primary" />,
+                icon: <Sparkles className="w-7 h-7 text-primary" />,
                 step: "02",
-                title: "Discover Matches",
-                desc: "Instantly see recipes ranked by how well they match your available ingredients. No missing items frustration.",
+                title: "Discover perfect matches",
+                desc: "Instantly see recipes ranked by how well they fit your ingredients. No missing items, no mid-recipe supermarket dashes.",
               },
               {
-                icon: <ChefHat className="w-6 h-6 text-primary" />,
+                icon: <ChefHat className="w-7 h-7 text-primary" />,
                 step: "03",
-                title: "Cook with Confidence",
-                desc: "Follow step-by-step instructions crafted for Indian home kitchens, with exact measurements and tips.",
+                title: "Cook with confidence",
+                desc: "Step-by-step instructions crafted for Indian home kitchens, with exact measurements and expert tips built in.",
               },
             ].map((feature, i) => (
-              <div key={i} className="relative bg-card border border-card-border rounded-2xl p-8 hover-elevate cursor-default">
-                <div className="absolute top-6 right-6 text-5xl font-bold text-border/60 font-mono select-none">{feature.step}</div>
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+              <div key={i} className="text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto mb-6 border border-primary/12">
                   {feature.icon}
                 </div>
+                <p className="text-xs font-bold text-primary/60 uppercase tracking-[0.15em] mb-2">{feature.step}</p>
                 <h3 className="font-serif text-xl font-bold text-foreground mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
+                <p className="text-muted-foreground leading-relaxed text-sm">{feature.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Cuisine Types Section */}
-      <section id="cuisines" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">Cuisine Coverage</Badge>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground">From Kashmir to Kanyakumari</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Explore the rich diversity of India's vegetarian culinary traditions.</p>
-          </div>
+      {/* Cuisine types — clean pill layout */}
+      <section id="cuisines" className="py-24 px-6 bg-muted/40">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">Cuisine Coverage</p>
+          <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-4">
+            From Kashmir <em>to</em> Kanyakumari
+          </h2>
+          <p className="text-muted-foreground text-base mb-14 max-w-xl mx-auto leading-relaxed">
+            Explore the rich diversity of India's vegetarian culinary traditions — 11 regional cuisines, 200+ recipes.
+          </p>
           <div className="flex flex-wrap justify-center gap-3">
             {[
               { name: "North Indian", emoji: "🌶️" },
@@ -183,8 +160,8 @@ export default function LandingPage() {
               { name: "Fusion", emoji: "✨" },
               { name: "Pan-Indian", emoji: "🇮🇳" },
             ].map((cuisine) => (
-              <div key={cuisine.name} className="flex items-center gap-2 px-5 py-3 bg-card border border-card-border rounded-full hover-elevate cursor-pointer">
-                <span className="text-lg">{cuisine.emoji}</span>
+              <div key={cuisine.name} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-border rounded-full shadow-sm hover-elevate cursor-pointer">
+                <span className="text-base">{cuisine.emoji}</span>
                 <span className="text-sm font-medium text-foreground">{cuisine.name}</span>
               </div>
             ))}
@@ -193,11 +170,12 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-24 px-6 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">Community Love</Badge>
-            <h2 className="font-serif text-4xl font-bold text-foreground">What Cooks Are Saying</h2>
+      <section id="community" className="py-28 px-6 bg-background">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">Community Love</p>
+            <h2 className="font-serif text-4xl font-bold text-foreground">More than 50,000 meals enjoyed</h2>
+            <p className="text-muted-foreground mt-3 text-base">Join the thousands who've discovered the secret to sensational weeknight cooking.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -205,14 +183,14 @@ export default function LandingPage() {
               { name: "Rahul M.", location: "Delhi", quote: "The Recipe Filter is magic. I typed 'dal and some spices' and got 12 authentic recipes instantly.", stars: 5 },
               { name: "Meera K.", location: "Mumbai", quote: "As a Gujarati, I was skeptical. But the regional recipe accuracy is truly impressive.", stars: 5 },
             ].map((t, i) => (
-              <div key={i} className="bg-card border border-card-border rounded-2xl p-6 space-y-4">
+              <div key={i} className="bg-white border border-card-border rounded-2xl p-7 space-y-4 shadow-sm">
                 <div className="flex gap-0.5">
                   {Array.from({ length: t.stars }).map((_, j) => (
-                    <Star key={j} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    <Star key={j} className="w-4 h-4 text-amber-400 fill-amber-400" />
                   ))}
                 </div>
-                <p className="text-foreground leading-relaxed">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-border">
+                <p className="text-foreground leading-relaxed text-sm">"{t.quote}"</p>
+                <div className="flex items-center gap-3 pt-3 border-t border-border">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                     {t.name[0]}
                   </div>
@@ -227,26 +205,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h2 className="font-serif text-5xl font-bold text-foreground leading-tight">
-            Ready to cook something <span className="text-primary">wonderful?</span>
+      {/* Final CTA — dark band like SimplyCook */}
+      <section className="py-28 px-6 bg-[#1c1410]">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="font-serif text-5xl md:text-6xl font-bold text-white leading-tight mb-6">
+            Ready to cook something <span style={{ color: "hsl(16 72% 62%)" }}>wonderful?</span>
           </h2>
-          <p className="text-muted-foreground text-lg">Join thousands of Indian home cooks who've transformed their kitchens.</p>
+          <p className="text-white/55 text-lg mb-10 leading-relaxed">
+            Join thousands of Indian home cooks who've transformed their weeknight dinners.
+          </p>
           <a href="/api/login">
-            <Button size="lg" data-testid="button-cta-final" className="gap-2 px-10 h-14 text-base font-medium shadow-lg">
+            <Button size="lg" data-testid="button-cta-final" className="gap-2 px-12 text-base font-semibold shadow-xl" style={{ height: "56px" }}>
               Join Palate Lit — It's Free <ArrowRight className="w-4 h-4" />
             </Button>
           </a>
-          <p className="text-sm text-muted-foreground">No credit card required • 100% free to use</p>
+          <p className="text-white/30 text-sm mt-5">No credit card required · 100% free to use</p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border px-6 py-8">
+      <footer className="border-t border-border px-6 py-8 bg-background">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <img src={logoImg} alt="Palate Lit logo" className="w-6 h-6 rounded-md object-cover" />
             <span className="font-serif font-bold text-foreground">Palate Lit</span>
           </div>

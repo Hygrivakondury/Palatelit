@@ -82,27 +82,32 @@ export default function RecipeCard({ recipe, onClick, isFavorited, isAdmin }: Re
     <div
       data-testid={`card-recipe-${recipe.id}`}
       onClick={onClick}
-      className="group bg-card border border-card-border rounded-2xl overflow-hidden cursor-pointer hover-elevate active-elevate transition-all duration-200 flex flex-col"
+      className="group bg-card border border-card-border rounded-xl overflow-hidden cursor-pointer hover-elevate active-elevate transition-all duration-200 flex flex-col shadow-sm"
     >
-      {/* Image / Placeholder */}
-      <div className="relative w-full h-44 bg-gradient-to-br from-primary/10 via-primary/5 to-accent overflow-hidden flex-shrink-0">
+      {/* Image / Placeholder — taller, more image-forward */}
+      <div className="relative w-full h-52 bg-muted overflow-hidden flex-shrink-0">
         {recipe.imageUrl && !imgError ? (
           <img
             src={`${recipe.imageUrl}?v=2`}
             alt={recipe.title}
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-6xl">{emoji}</span>
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-accent/30">
+            <span className="text-7xl">{emoji}</span>
           </div>
         )}
-        <div className="absolute top-3 left-3">
-          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${badgeClass}`}>
-            {recipe.cuisineType}
+        {/* Subtle gradient on hover for title visibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+        {/* Cuisine badge — bottom left, clean */}
+        <div className="absolute bottom-3 left-3">
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm ${badgeClass}`}>
+            {emoji} {recipe.cuisineType}
           </span>
         </div>
+
         {isFavorited && (
           <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 dark:bg-black/70 flex items-center justify-center shadow-sm">
             <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
@@ -114,7 +119,7 @@ export default function RecipeCard({ recipe, onClick, isFavorited, isAdmin }: Re
             onClick={handleDeleteClick}
             disabled={deleteMutation.isPending}
             title={confirmDelete ? "Click again to confirm delete" : "Delete recipe"}
-            className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium shadow transition-all ${
+            className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium shadow transition-all ${
               confirmDelete
                 ? "bg-red-600 text-white"
                 : "bg-white/90 dark:bg-black/70 text-red-500 hover:bg-red-600 hover:text-white"
@@ -126,19 +131,19 @@ export default function RecipeCard({ recipe, onClick, isFavorited, isAdmin }: Re
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-serif text-base font-bold text-card-foreground leading-snug mb-1.5 line-clamp-2 group-hover:text-primary transition-colors">
+      {/* Content — clean, spacious */}
+      <div className="p-5 flex flex-col flex-1">
+        <h3 className="font-serif text-base font-bold text-card-foreground leading-snug mb-2 line-clamp-2 group-hover:text-primary transition-colors duration-200">
           {recipe.title}
         </h3>
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed flex-1">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-4 leading-relaxed flex-1">
           {recipe.description}
         </p>
 
-        {/* Dietary Tags */}
+        {/* Dietary Tags — minimal, only vegan/special */}
         {recipe.dietaryTags && recipe.dietaryTags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {recipe.dietaryTags.map((tag) => (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {recipe.dietaryTags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
                 data-testid={`tag-dietary-${recipe.id}-${tag.toLowerCase().replace(/\s+/g, "-")}`}
@@ -153,17 +158,17 @@ export default function RecipeCard({ recipe, onClick, isFavorited, isAdmin }: Re
           </div>
         )}
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-3 border-t border-border">
           <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-primary" />
+            <Clock className="w-3.5 h-3.5 text-primary/70" />
             <span>{totalTime} min</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 text-primary" />
+            <Users className="w-3.5 h-3.5 text-primary/70" />
             <span>{recipe.servings} servings</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <ChefHat className="w-3.5 h-3.5 text-primary" />
+          <div className="flex items-center gap-1.5 ml-auto">
+            <ChefHat className="w-3.5 h-3.5 text-primary/70" />
             <span>{recipe.ingredients.length} items</span>
           </div>
         </div>
