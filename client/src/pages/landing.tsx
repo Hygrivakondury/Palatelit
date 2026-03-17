@@ -35,7 +35,7 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/8 text-white/70 text-xs font-medium mb-10 tracking-wide uppercase">
             <Sparkles className="w-3 h-3" />
-            100% Vegetarian · Made for India
+            100% Vegetarian · Mouth Watering Indian Foods
           </div>
 
           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.04] tracking-tight mb-8">
