@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Camera, Plus, Trash2, Loader2, Sparkles, X,
   ShoppingBag, ChefHat, AlertCircle, Check, Image,
-  Lightbulb, RefreshCw, RotateCcw,
+  Lightbulb, RefreshCw, RotateCcw, WandSparkles, Clock, Users,
 } from "lucide-react";
 import type { PantryItem, Recipe } from "@shared/schema";
 
@@ -16,6 +16,20 @@ interface RecipeSuggestion {
   matchPct: number;
   missingMain: string[];
   missingSpices: string[];
+}
+
+interface AIGeneratedRecipe {
+  title: string;
+  description: string;
+  ingredients: string[];
+  instructions: string[];
+  prepTime: number;
+  cookTime: number;
+  servings: number;
+  cuisineType: string;
+  dietaryTags: string[];
+  pantryIngredients: string[];
+  additionalIngredients: string[];
 }
 
 interface PantryGenieTabProps {
@@ -32,9 +46,11 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const [identified, setIdentified] = useState<string[]>([]);
   const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
   const [suggestions, setSuggestions] = useState<RecipeSuggestion[]>([]);
+  const [aiRecipe, setAiRecipe] = useState<AIGeneratedRecipe | null>(null);
   const [hasSuggested, setHasSuggested] = useState(false);
   const [generatingImageFor, setGeneratingImageFor] = useState<number | null>(null);
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+  const [expandedAiSteps, setExpandedAiSteps] = useState(false);
 
   // Camera modal state
   const [showCamera, setShowCamera] = useState(false);
@@ -162,6 +178,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/pantry"] });
       setSuggestions([]);
+      setAiRecipe(null);
       setHasSuggested(false);
     },
   });
@@ -174,6 +191,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/pantry"] });
       setSuggestions([]);
+      setAiRecipe(null);
       setHasSuggested(false);
     },
   });
@@ -215,6 +233,31 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
       setHasSuggested(true);
     },
   });
+
+  const generateAiRecipeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/pantry/generate-recipe", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Failed to generate AI recipe");
+      }
+      return res.json() as Promise<{ recipe: AIGeneratedRecipe }>;
+    },
+    onSuccess: (data) => {
+      setAiRecipe(data.recipe);
+      setExpandedAiSteps(false);
+    },
+  });
+
+  const handleFindRecipes = () => {
+    setAiRecipe(null);
+    suggestMutation.mutate();
+    generateAiRecipeMutation.mutate();
+  };
 
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -601,35 +644,45 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
         <Button
           data-testid="button-find-recipes"
           className="w-full bg-primary hover:bg-primary/90 py-5 text-base font-semibold"
-          onClick={() => suggestMutation.mutate()}
-          disabled={suggestMutation.isPending}
+          onClick={handleFindRecipes}
+          disabled={suggestMutation.isPending || generateAiRecipeMutation.isPending}
         >
-          {suggestMutation.isPending ? (
+          {suggestMutation.isPending || generateAiRecipeMutation.isPending ? (
             <>
               <Loader2 size={18} className="animate-spin mr-2" />
-              Finding recipes for your pantry…
+              {generateAiRecipeMutation.isPending && !suggestMutation.isPending
+                ? "Creating your AI recipe…"
+                : "Finding recipes for your pantry…"}
             </>
           ) : (
             <>
               <ChefHat size={18} className="mr-2" />
-              {hasSuggested ? "Refresh Recipe Suggestions" : "Find Recipes from My Pantry"}
+              {hasSuggested ? "Refresh Suggestions" : "Find Recipes from My Pantry"}
             </>
           )}
         </Button>
       )}
 
-      {/* Recipe suggestions */}
+      {/* ── SECTION 1: Recipes from Our Library ── */}
       {hasSuggested && (
         <div className="space-y-4">
-          <h3 className="font-semibold text-neutral-800 dark:text-neutral-100 text-lg flex items-center gap-2">
+          <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-700 pb-2">
             <ChefHat size={18} className="text-primary" />
-            Recipes You Can Make
-            <span className="text-sm font-normal text-neutral-500 ml-1">
-              ({suggestions.length} match{suggestions.length !== 1 ? "es" : ""})
+            <h3 className="font-semibold text-neutral-800 dark:text-neutral-100 text-base">
+              From Our Recipe Library
+            </h3>
+            <span className="text-xs font-normal text-neutral-500 ml-1">
+              {suggestions.length} match{suggestions.length !== 1 ? "es" : ""}
             </span>
-          </h3>
+          </div>
 
-          {suggestions.length === 0 ? (
+          {suggestMutation.isPending ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : suggestions.length === 0 ? (
             <div className="bg-neutral-50 dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-6 text-center text-neutral-500">
               <AlertCircle size={28} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm">No recipe matches found. Try adding more ingredients to your pantry.</p>
@@ -644,8 +697,8 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
                 {generatedImages[recipe.id] ? (
                   <img src={generatedImages[recipe.id]} alt={recipe.title} className="w-full h-48 object-cover" />
                 ) : (
-                  <div className="w-full h-32 bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 flex items-center justify-center">
-                    <ChefHat size={40} className="text-amber-300 dark:text-amber-600" />
+                  <div className="w-full h-28 bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 flex items-center justify-center">
+                    <ChefHat size={36} className="text-amber-300 dark:text-amber-600" />
                   </div>
                 )}
 
@@ -724,6 +777,157 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* ── SECTION 2: AI-Generated Recipe ── */}
+      {hasSuggested && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-violet-200 dark:border-violet-800 pb-2">
+            <WandSparkles size={18} className="text-violet-500" />
+            <h3 className="font-semibold text-neutral-800 dark:text-neutral-100 text-base">
+              AI-Created Recipe Just for You
+            </h3>
+            <span className="text-xs bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full font-medium">New</span>
+          </div>
+
+          {generateAiRecipeMutation.isPending ? (
+            <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-violet-200 dark:border-violet-800 p-6 flex flex-col items-center gap-3 text-violet-600 dark:text-violet-400">
+              <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+                <WandSparkles size={20} className="animate-pulse" />
+              </div>
+              <p className="text-sm font-medium">AI is crafting a personalised recipe with your ingredients…</p>
+              <p className="text-xs text-neutral-400">This takes a few seconds</p>
+            </div>
+          ) : generateAiRecipeMutation.isError ? (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 text-red-700 dark:text-red-300">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">Could not generate AI recipe</p>
+                <p className="text-xs mt-0.5 opacity-80">{(generateAiRecipeMutation.error as Error)?.message}</p>
+                <button className="text-xs underline mt-1 opacity-70 hover:opacity-100" onClick={() => generateAiRecipeMutation.mutate()}>
+                  Try again
+                </button>
+              </div>
+            </div>
+          ) : aiRecipe ? (
+            <div
+              data-testid="ai-recipe-card"
+              className="bg-white dark:bg-neutral-800 rounded-2xl border-2 border-violet-200 dark:border-violet-800 overflow-hidden shadow-sm"
+            >
+              {/* AI badge header */}
+              <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center gap-2">
+                <WandSparkles size={16} className="text-white" />
+                <span className="text-white text-sm font-semibold">AI-Generated Recipe</span>
+                <span className="ml-auto text-violet-200 text-xs">{aiRecipe.cuisineType}</span>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {/* Title + meta */}
+                <div>
+                  <h4
+                    data-testid="ai-recipe-title"
+                    className="font-bold text-neutral-800 dark:text-neutral-100 text-lg leading-tight"
+                  >
+                    {aiRecipe.title}
+                  </h4>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed">{aiRecipe.description}</p>
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="flex items-center gap-1 text-xs text-neutral-500">
+                      <Clock size={11} />
+                      Prep {aiRecipe.prepTime ?? "—"}m · Cook {aiRecipe.cookTime ?? "—"}m
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-neutral-500">
+                      <Users size={11} />
+                      Serves {aiRecipe.servings ?? "—"}
+                    </span>
+                    {aiRecipe.dietaryTags?.map((tag) => (
+                      <span key={tag} className="text-xs bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 px-2 py-0.5 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pantry ingredients used */}
+                {aiRecipe.pantryIngredients?.length > 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-100 dark:border-green-800">
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-1.5">
+                      <Check size={12} className="text-green-600" />
+                      From your pantry ({aiRecipe.pantryIngredients.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiRecipe.pantryIngredients.map((ing) => (
+                        <span key={ing} className="text-xs bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 px-2 py-0.5 rounded-full">{ing}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional ingredients needed */}
+                {aiRecipe.additionalIngredients?.length > 0 && (
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 border border-orange-100 dark:border-orange-800">
+                    <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 mb-2 flex items-center gap-1.5">
+                      <ShoppingBag size={12} />
+                      You'll also need ({aiRecipe.additionalIngredients.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiRecipe.additionalIngredients.map((ing) => (
+                        <span key={ing} className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 px-2 py-0.5 rounded-full">{ing}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full ingredients list */}
+                <div>
+                  <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-2">All Ingredients</p>
+                  <ul className="space-y-1">
+                    {aiRecipe.ingredients?.map((ing, i) => (
+                      <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                        {ing}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Instructions — collapsed/expanded */}
+                <div>
+                  <button
+                    className="text-xs font-semibold text-violet-600 dark:text-violet-400 flex items-center gap-1 hover:underline"
+                    onClick={() => setExpandedAiSteps((v) => !v)}
+                    data-testid="button-toggle-ai-steps"
+                  >
+                    {expandedAiSteps ? "Hide" : "Show"} step-by-step instructions ({aiRecipe.instructions?.length} steps)
+                  </button>
+                  {expandedAiSteps && (
+                    <ol className="space-y-2 mt-2">
+                      {aiRecipe.instructions?.map((step, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm text-neutral-600 dark:text-neutral-400">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 text-xs font-bold flex items-center justify-center">
+                            {i + 1}
+                          </span>
+                          <span className="leading-relaxed pt-0.5">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+
+                {/* Regenerate button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-violet-300 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                  onClick={() => generateAiRecipeMutation.mutate()}
+                  disabled={generateAiRecipeMutation.isPending}
+                  data-testid="button-regenerate-ai-recipe"
+                >
+                  <RefreshCw size={13} className={`mr-1.5 ${generateAiRecipeMutation.isPending ? "animate-spin" : ""}`} />
+                  Create a Different AI Recipe
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

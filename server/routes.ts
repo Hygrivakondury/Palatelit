@@ -809,6 +809,58 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     }
   });
 
+  // ─── AI RECIPE GENERATION ──────────────────────────────────────
+  app.post("/api/pantry/generate-recipe", isAuthenticated, async (req: any, res) => {
+    try {
+      const pantry = await storage.getPantryItems(req.user.claims.sub);
+      if (pantry.length === 0) {
+        return res.status(400).json({ message: "Add ingredients to your pantry first" });
+      }
+
+      const pantryList = pantry.map((p) => p.name).join(", ");
+
+      const prompt = `You are an expert Indian vegetarian recipe creator. A user has these ingredients in their pantry: ${pantryList}.
+
+Create ONE original, delicious Indian vegetarian recipe that uses as many of these pantry ingredients as possible. The recipe must be 100% vegetarian (no meat, fish, or eggs).
+
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "title": "Recipe Name",
+  "description": "One or two sentence description of the dish",
+  "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
+  "instructions": ["Step 1", "Step 2", "Step 3"],
+  "prepTime": 15,
+  "cookTime": 25,
+  "servings": 4,
+  "cuisineType": "North Indian",
+  "dietaryTags": ["Vegan"],
+  "pantryIngredients": ["ingredients from user's pantry used"],
+  "additionalIngredients": ["extra ingredients needed not in pantry"]
+}
+
+dietaryTags must be an array containing only items from: ["Vegan", "Gluten-Free", "Jain Friendly"] — only include if truly applicable.
+cuisineType must be one of: North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Pan-Indian, East Indian, West Indian, Fusion.
+pantryIngredients should list which of the user's pantry items are used in the recipe.
+additionalIngredients should list any extra ingredients needed beyond the pantry.`;
+
+      const aiResponse = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+        temperature: 0.8,
+      });
+
+      const raw = aiResponse.choices[0]?.message?.content ?? "{}";
+      const parsed = JSON.parse(raw);
+
+      res.json({ recipe: parsed });
+    } catch (err) {
+      console.error("AI recipe generation error:", err);
+      res.status(500).json({ message: "Failed to generate AI recipe" });
+    }
+  });
+
   // ─── MEAL PLANS ────────────────────────────────────────────────
   app.get("/api/meal-plans", isAuthenticated, async (req: any, res) => {
     try {
