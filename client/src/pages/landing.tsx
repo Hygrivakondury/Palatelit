@@ -1,8 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Star, ChefHat, Sparkles, Search } from "lucide-react";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
+import { useQuery } from "@tanstack/react-query";
+import { SITE_CONTENT_DEFAULTS } from "@shared/schema";
+
+function useSiteContent() {
+  const { data } = useQuery<Record<string, string>>({
+    queryKey: ["/api/site-content"],
+  });
+  return (key: string) => (data?.[key] ?? SITE_CONTENT_DEFAULTS[key] ?? "");
+}
 
 export default function LandingPage() {
+  const sc = useSiteContent();
+
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Navigation */}
@@ -27,7 +38,6 @@ export default function LandingPage() {
 
       {/* Hero — full-width, dark, immersive */}
       <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-[#1c1410]">
-        {/* Background texture overlay */}
         <div className="absolute inset-0 opacity-20" style={{
           backgroundImage: `radial-gradient(circle at 30% 50%, hsl(16 72% 48% / 0.4) 0%, transparent 60%), radial-gradient(circle at 75% 20%, hsl(36 80% 55% / 0.25) 0%, transparent 50%)`
         }} />
@@ -35,16 +45,16 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/8 text-white/70 text-xs font-medium mb-10 tracking-wide uppercase">
             <Sparkles className="w-3 h-3" />
-            100% Vegetarian · Mouth Watering Indian Foods
+            {sc("hero_badge")}
           </div>
 
           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.04] tracking-tight mb-8">
-            Extraordinary <br />
-            <span style={{ color: "hsl(16 72% 62%)" }}>flavour,</span> on your terms
+            {sc("hero_headline_1")} <br />
+            <span style={{ color: "hsl(16 72% 62%)" }}>{sc("hero_headline_accent")}</span> {sc("hero_headline_2")}
           </h1>
 
           <p className="text-white/60 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-12 font-light">
-            Palate Lit finds authentic Indian vegetarian recipes perfectly matched to what's already in your kitchen — from pantry to plate in under 30 minutes.
+            {sc("hero_description")}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
@@ -52,10 +62,10 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 data-testid="button-get-started-hero"
-                className="gap-2 px-10 h-13 text-base font-semibold shadow-xl"
+                className="gap-2 px-10 text-base font-semibold shadow-xl"
                 style={{ height: "52px", minWidth: "200px" }}
               >
-                Start Cooking — It's Free <ArrowRight className="w-4 h-4" />
+                {sc("hero_cta_primary")} <ArrowRight className="w-4 h-4" />
               </Button>
             </a>
             <a href="#how-it-works">
@@ -63,10 +73,10 @@ export default function LandingPage() {
                 size="lg"
                 variant="outline"
                 data-testid="button-learn-more"
-                className="h-13 text-base font-medium px-8 border-white/20 text-white/80 bg-white/5 hover:bg-white/10"
+                className="text-base font-medium px-8 border-white/20 text-white/80 bg-white/5 hover:bg-white/10"
                 style={{ height: "52px" }}
               >
-                See How It Works
+                {sc("hero_cta_secondary")}
               </Button>
             </a>
           </div>
@@ -91,37 +101,21 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Bottom fade */}
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* Three pillars — SimplyCook style */}
+      {/* How It Works */}
       <section id="how-it-works" className="py-28 px-6 bg-background">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
             <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">How It Works</p>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground">Simple. Delicious. <em>Indian.</em></h2>
+            <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground">{sc("section_how_title")}</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-12">
             {[
-              {
-                icon: <Search className="w-7 h-7 text-primary" />,
-                step: "01",
-                title: "Tell us what you have",
-                desc: "Type the ingredients sitting in your fridge or pantry — paneer, dal, vegetables, spices. Our smart filter understands natural language.",
-              },
-              {
-                icon: <Sparkles className="w-7 h-7 text-primary" />,
-                step: "02",
-                title: "Discover perfect matches",
-                desc: "Instantly see recipes ranked by how well they fit your ingredients. No missing items, no mid-recipe supermarket dashes.",
-              },
-              {
-                icon: <ChefHat className="w-7 h-7 text-primary" />,
-                step: "03",
-                title: "Cook with confidence",
-                desc: "Step-by-step instructions crafted for Indian home kitchens, with exact measurements and expert tips built in.",
-              },
+              { icon: <Search className="w-7 h-7 text-primary" />, step: "01", title: "Tell us what you have", desc: "Type the ingredients sitting in your fridge or pantry — paneer, dal, vegetables, spices. Our smart filter understands natural language." },
+              { icon: <Sparkles className="w-7 h-7 text-primary" />, step: "02", title: "Discover perfect matches", desc: "Instantly see recipes ranked by how well they fit your ingredients. No missing items, no mid-recipe supermarket dashes." },
+              { icon: <ChefHat className="w-7 h-7 text-primary" />, step: "03", title: "Cook with confidence", desc: "Step-by-step instructions crafted for Indian home kitchens, with exact measurements and expert tips built in." },
             ].map((feature, i) => (
               <div key={i} className="text-center">
                 <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto mb-6 border border-primary/12">
@@ -136,15 +130,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Cuisine types — clean pill layout */}
+      {/* Cuisines */}
       <section id="cuisines" className="py-24 px-6 bg-muted/40">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">Cuisine Coverage</p>
           <h2 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-4">
-            From Kashmir <em>to</em> Kanyakumari
+            {sc("section_cuisines_title")}
           </h2>
           <p className="text-muted-foreground text-base mb-14 max-w-xl mx-auto leading-relaxed">
-            Explore the rich diversity of India's vegetarian culinary traditions — 11 regional cuisines, 200+ recipes.
+            {sc("section_cuisines_description")}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             {[
@@ -174,8 +168,8 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <p className="text-primary text-sm font-semibold uppercase tracking-widest mb-4">Community Love</p>
-            <h2 className="font-serif text-4xl font-bold text-foreground">More than 50,000 meals enjoyed</h2>
-            <p className="text-muted-foreground mt-3 text-base">Join the thousands who've discovered the secret to sensational weeknight cooking.</p>
+            <h2 className="font-serif text-4xl font-bold text-foreground">{sc("section_community_title")}</h2>
+            <p className="text-muted-foreground mt-3 text-base">{sc("section_community_description")}</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -205,18 +199,18 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Final CTA — dark band like SimplyCook */}
+      {/* Final CTA */}
       <section className="py-28 px-6 bg-[#1c1410]">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="font-serif text-5xl md:text-6xl font-bold text-white leading-tight mb-6">
-            Ready to cook something <span style={{ color: "hsl(16 72% 62%)" }}>wonderful?</span>
+            {sc("cta_headline_main")} <span style={{ color: "hsl(16 72% 62%)" }}>{sc("cta_headline_accent")}</span>
           </h2>
           <p className="text-white/55 text-lg mb-10 leading-relaxed">
-            Join thousands of Indian home cooks who've transformed their weeknight dinners.
+            {sc("cta_description")}
           </p>
           <a href="/api/login">
             <Button size="lg" data-testid="button-cta-final" className="gap-2 px-12 text-base font-semibold shadow-xl" style={{ height: "56px" }}>
-              Join Palate Lit — It's Free <ArrowRight className="w-4 h-4" />
+              {sc("cta_button")} <ArrowRight className="w-4 h-4" />
             </Button>
           </a>
           <p className="text-white/30 text-sm mt-5">No credit card required · 100% free to use</p>
@@ -230,7 +224,7 @@ export default function LandingPage() {
             <img src={logoImg} alt="Palate Lit logo" className="w-6 h-6 rounded-md object-cover" />
             <span className="font-serif font-bold text-foreground">Palate Lit</span>
           </div>
-          <p className="text-sm text-muted-foreground">© 2026 Palate Lit. Celebrating India's vegetarian heritage.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Palate Lit. {sc("footer_tagline")}</p>
         </div>
       </footer>
     </div>

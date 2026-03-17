@@ -1449,5 +1449,27 @@ Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet 
     }
   });
 
+  // ─── SITE CONTENT ────────────────────────────────────────────────
+  app.get("/api/site-content", async (_req, res) => {
+    try {
+      const content = await storage.getSiteContent();
+      res.json(content);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch site content" });
+    }
+  });
+
+  app.put("/api/site-content", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const entries = req.body as Array<{ key: string; value: string }>;
+      if (!Array.isArray(entries)) return res.status(400).json({ message: "Expected array of {key, value}" });
+      await storage.upsertSiteContentBulk(entries, req.user.claims.email);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update site content" });
+    }
+  });
+
   return httpServer;
 }

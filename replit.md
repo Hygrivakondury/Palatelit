@@ -46,7 +46,8 @@ A full-stack vegetarian recipe discovery platform for the Indian community. User
 - **Community Recipes**: Dedicated Community tab showing all user-submitted recipes with author info; each card has View (opens recipe modal) and Chat buttons
 - **Community Chat**: Per-recipe chat window where users can message the recipe author and other cooks
 - **User Recipe Library**: Submitted recipes appear in both the global recipe library and the submitter's personal library
-- **Admin System**: Two hardcoded admin emails (`genieflavour@gmail.com`, `gurumurthy.sastry@gmail.com`) enforced server-side; 7-tab admin panel: Recipes, Community, Commerce, Feedback, Images, Blog Posts, Monetize (Ad Slots)
+- **Admin System**: Two hardcoded admin emails (`genieflavour@gmail.com`, `gurumurthy.sastry@gmail.com`) enforced server-side; 8-tab admin panel: Recipes, Community, Commerce, Feedback, Images, Blog Posts, Monetize (Ad Slots), Page Content
+- **Site Content Editor**: Admin "Page Content" tab allows editing all landing page text (hero badge, headlines, CTAs, section titles, footer tagline) stored in the `site_content` DB table; landing page reads from `/api/site-content` with `SITE_CONTENT_DEFAULTS` fallback
 - **Blog Admin**: Create/edit/delete blog posts with markdown editor, publish/unpublish toggle, tag support, excerpt management
 - **Ad Slot Monetization**: 4 configurable ad slots (blog_banner_top, blog_inline, blog_banner_bottom, recipe_sidebar) — paste any ad HTML/JS snippet, toggle active/inactive per slot
 - **Green & Gold theme**: Professional, elegant design using Open Sans + Lora fonts

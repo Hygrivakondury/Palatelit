@@ -1,10 +1,10 @@
 import {
   recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
-  blogPosts, blogComments, adSlots,
+  blogPosts, blogComments, adSlots, siteContent,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
   type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
-  type UserFeedback, type BlogPost, type InsertBlogPost, type BlogComment, type AdSlot,
+  type UserFeedback, type BlogPost, type InsertBlogPost, type BlogComment, type AdSlot, type SiteContent,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc, getTableColumns } from "drizzle-orm";
@@ -90,6 +90,9 @@ export interface IStorage {
   // Ad Slots
   getAdSlots(): Promise<AdSlot[]>;
   upsertAdSlot(slotName: string, data: Partial<Omit<AdSlot, "id" | "slotName">>, updatedBy: string): Promise<AdSlot>;
+  // Site Content
+  getSiteContent(): Promise<Record<string, string>>;
+  upsertSiteContentBulk(entries: Array<{ key: string; value: string }>, updatedBy: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -588,6 +591,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(adSlots.slotName, slotName))
       .returning();
     return updated;
+  }
+
+  async getSiteContent(): Promise<Record<string, string>> {
+    const rows = await db.select().from(siteContent);
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      result[row.key] = row.value;
+    }
+    return result;
+  }
+
+  async upsertSiteContentBulk(entries: Array<{ key: string; value: string }>, updatedBy: string): Promise<void> {
+    for (const entry of entries) {
+      await db.insert(siteContent)
+        .values({ key: entry.key, value: entry.value, updatedBy, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: siteContent.key,
+          set: { value: entry.value, updatedBy, updatedAt: new Date() },
+        });
+    }
   }
 }
 

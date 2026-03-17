@@ -359,3 +359,34 @@ export type AdSlot = typeof adSlots.$inferSelect;
 
 export const AD_SLOT_NAMES = ["blog_banner_top", "blog_inline", "blog_banner_bottom", "recipe_sidebar"] as const;
 export type AdSlotName = typeof AD_SLOT_NAMES[number];
+
+// ─── SITE CONTENT ──────────────────────────────────────────────────────────
+
+export const siteContent = pgTable("site_content", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by"),
+});
+
+export type SiteContent = typeof siteContent.$inferSelect;
+
+export const SITE_CONTENT_DEFAULTS: Record<string, string> = {
+  hero_badge: "100% Vegetarian · Mouth Watering Indian Foods",
+  hero_headline_1: "Extraordinary",
+  hero_headline_accent: "flavour,",
+  hero_headline_2: "on your terms",
+  hero_description: "Palate Lit finds authentic Indian vegetarian recipes perfectly matched to what's already in your kitchen — from pantry to plate in under 30 minutes.",
+  hero_cta_primary: "Start Cooking — It's Free",
+  hero_cta_secondary: "See How It Works",
+  section_how_title: "Simple. Delicious. Indian.",
+  section_cuisines_title: "From Kashmir to Kanyakumari",
+  section_cuisines_description: "Explore the rich diversity of India's vegetarian culinary traditions — 11 regional cuisines, 200+ recipes.",
+  section_community_title: "More than 50,000 meals enjoyed",
+  section_community_description: "Join the thousands who've discovered the secret to sensational weeknight cooking.",
+  cta_headline_main: "Ready to cook something",
+  cta_headline_accent: "wonderful?",
+  cta_description: "Join thousands of Indian home cooks who've transformed their weeknight dinners.",
+  cta_button: "Join Palate Lit — It's Free",
+  footer_tagline: "Celebrating India's vegetarian heritage.",
+};

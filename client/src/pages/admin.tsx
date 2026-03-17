@@ -12,16 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Loader2, ShoppingBag, ArrowLeft, Save, ExternalLink, ImageIcon, ScanSearch,
   MessageSquare, Send, ChevronDown, ChevronUp, UtensilsCrossed, Users,
-  Plus, X, Pencil, Trash2, Search, CheckCircle2, ChefHat, PenSquare, Eye, EyeOff, DollarSign,
+  Plus, X, Pencil, Trash2, Search, CheckCircle2, ChefHat, PenSquare, Eye, EyeOff, DollarSign, FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import type { AffiliateLink, UserFeedback, Recipe, BlogPost, AdSlot } from "@shared/schema";
-import { CUISINE_TYPES, DIETARY_TAGS, AD_SLOT_NAMES } from "@shared/schema";
+import { CUISINE_TYPES, DIETARY_TAGS, AD_SLOT_NAMES, SITE_CONTENT_DEFAULTS } from "@shared/schema";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
-type AdminTab = "recipes" | "community" | "commerce" | "feedback" | "images" | "blog" | "monetize";
+type AdminTab = "recipes" | "community" | "commerce" | "feedback" | "images" | "blog" | "monetize" | "content";
 
 const SLOT_META: Record<string, { emoji: string; color: string; bgColor: string }> = {
   amazon: { emoji: "🛒", color: "text-orange-700", bgColor: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800" },
@@ -1006,6 +1006,141 @@ function MonetizeSection() {
   );
 }
 
+// ─── SITE CONTENT SECTION ──────────────────────────────────────────────────
+
+const CONTENT_FIELDS: Array<{ key: string; label: string; description: string; multiline?: boolean }> = [
+  { key: "hero_badge", label: "Hero Badge Text", description: "Small pill badge at the top of the hero section" },
+  { key: "hero_headline_1", label: "Hero Headline — Line 1", description: "First line of the large hero heading" },
+  { key: "hero_headline_accent", label: "Hero Headline — Accent Word", description: "The highlighted terracotta-coloured word(s) in the hero heading" },
+  { key: "hero_headline_2", label: "Hero Headline — Line 2", description: "Second line of the hero heading (e.g. \"on your terms\")" },
+  { key: "hero_description", label: "Hero Description", description: "Paragraph text below the hero headline", multiline: true },
+  { key: "hero_cta_primary", label: "Hero Primary Button", description: "Text on the main call-to-action button" },
+  { key: "hero_cta_secondary", label: "Hero Secondary Button", description: "Text on the secondary button" },
+  { key: "section_how_title", label: "How It Works — Heading", description: "Section heading for the three-step explainer" },
+  { key: "section_cuisines_title", label: "Cuisines Section — Heading", description: "Heading for the cuisine types section" },
+  { key: "section_cuisines_description", label: "Cuisines Section — Description", description: "Description text for the cuisine pills section", multiline: true },
+  { key: "section_community_title", label: "Community Section — Heading", description: "Heading for the testimonials section" },
+  { key: "section_community_description", label: "Community Section — Description", description: "Subtitle below the testimonials heading", multiline: true },
+  { key: "cta_headline_main", label: "Final CTA — Headline", description: "Main text of the final call-to-action (before the accent word)" },
+  { key: "cta_headline_accent", label: "Final CTA — Accent Word", description: "The highlighted word at the end of the CTA headline" },
+  { key: "cta_description", label: "Final CTA — Description", description: "Paragraph below the CTA headline", multiline: true },
+  { key: "cta_button", label: "Final CTA — Button Text", description: "Text on the final join button" },
+  { key: "footer_tagline", label: "Footer Tagline", description: "Short tagline shown in the footer" },
+];
+
+function SiteContentSection() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: savedContent = {}, isLoading } = useQuery<Record<string, string>>({
+    queryKey: ["/api/site-content"],
+  });
+
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Seed draft from saved content when it loads
+  const mergedValues = (key: string) => draft[key] ?? savedContent[key] ?? SITE_CONTENT_DEFAULTS[key] ?? "";
+
+  const handleChange = (key: string, value: string) => {
+    setDraft(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const entries = CONTENT_FIELDS.map(f => ({ key: f.key, value: mergedValues(f.key) }));
+      return apiRequest("PUT", "/api/site-content", entries);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/site-content"] });
+      setDraft({});
+      setHasChanges(false);
+      toast({ title: "Landing page updated!", description: "Changes are live on your site." });
+    },
+    onError: () => toast({ title: "Save failed", variant: "destructive" }),
+  });
+
+  const resetField = (key: string) => {
+    setDraft(prev => ({ ...prev, [key]: SITE_CONTENT_DEFAULTS[key] ?? "" }));
+    setHasChanges(true);
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold font-serif text-foreground">Landing Page Content</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Edit any text shown on the public landing page. Changes go live immediately after saving.</p>
+        </div>
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending || !hasChanges}
+          className="gap-2 flex-shrink-0"
+          data-testid="button-save-site-content"
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Changes
+        </Button>
+      </div>
+
+      {hasChanges && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-xs dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
+          <span className="font-semibold">Unsaved changes</span> — click "Save Changes" to publish them.
+        </div>
+      )}
+
+      <div className="space-y-5">
+        {CONTENT_FIELDS.map(field => (
+          <div key={field.key} className="bg-background border border-border rounded-xl p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <label className="text-sm font-semibold text-foreground">{field.label}</label>
+                <p className="text-xs text-muted-foreground leading-snug mt-0.5">{field.description}</p>
+              </div>
+              <button
+                onClick={() => resetField(field.key)}
+                className="text-xs text-muted-foreground hover:text-foreground underline flex-shrink-0 mt-0.5"
+                title="Reset to default"
+              >
+                Reset
+              </button>
+            </div>
+            {field.multiline ? (
+              <Textarea
+                value={mergedValues(field.key)}
+                onChange={e => handleChange(field.key, e.target.value)}
+                className="text-sm min-h-[80px] resize-y"
+                data-testid={`input-content-${field.key}`}
+              />
+            ) : (
+              <Input
+                value={mergedValues(field.key)}
+                onChange={e => handleChange(field.key, e.target.value)}
+                className="text-sm"
+                data-testid={`input-content-${field.key}`}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending || !hasChanges}
+          className="gap-2"
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save All Changes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: "recipes", label: "Recipes", icon: <UtensilsCrossed size={15} />, desc: "Create, edit, delete any recipe" },
   { id: "community", label: "Community", icon: <Users size={15} />, desc: "Moderate messages" },
@@ -1014,6 +1149,7 @@ const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ReactNode; desc: st
   { id: "images", label: "Images", icon: <ImageIcon size={15} />, desc: "Generate & fix AI images" },
   { id: "blog", label: "Blog Posts", icon: <PenSquare size={15} />, desc: "Write & manage blog posts" },
   { id: "monetize", label: "Monetize", icon: <DollarSign size={15} />, desc: "Ad slot configuration" },
+  { id: "content", label: "Page Content", icon: <FileText size={15} />, desc: "Edit landing page text" },
 ];
 
 export default function AdminPage() {
@@ -1103,6 +1239,7 @@ export default function AdminPage() {
                 <li>Reply to user feedback</li>
                 <li>Manage affiliate commerce links</li>
                 <li>Create/toggle weekly challenges</li>
+                <li>Edit landing page text (Page Content tab)</li>
               </ul>
               <p className="text-[10px] text-muted-foreground pt-1">Weekly Challenge controls are in the Challenge tab of the main app.</p>
             </div>
@@ -1136,6 +1273,7 @@ export default function AdminPage() {
             {activeTab === "images" && <ImageManagementSection />}
             {activeTab === "blog" && <BlogManagementSection />}
             {activeTab === "monetize" && <MonetizeSection />}
+            {activeTab === "content" && <SiteContentSection />}
           </main>
         </div>
       </div>
