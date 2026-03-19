@@ -6,7 +6,7 @@ import { relations } from "drizzle-orm";
 export * from "./models/auth";
 export * from "./models/chat";
 
-export const RECIPE_CATEGORIES = ["main", "dessert", "mocktail"] as const;
+export const RECIPE_CATEGORIES = ["main", "dessert", "mocktail", "no-cook"] as const;
 export type RecipeCategory = typeof RECIPE_CATEGORIES[number];
 
 export const recipes = pgTable("recipes", {

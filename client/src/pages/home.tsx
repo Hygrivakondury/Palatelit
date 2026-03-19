@@ -22,7 +22,7 @@ import { BlogTab } from "@/components/blog-tab";
 import {
   Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
-  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight, PenSquare,
+  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight, PenSquare, Zap,
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
@@ -31,7 +31,7 @@ import { CUISINE_TYPES } from "@shared/schema";
 const DIETARY_FILTER_OPTIONS = ["All", "Vegan", "Gluten-Free", "Jain Friendly"] as const;
 type TabId = "recipes" | "community" | "challenge" | "pantry" | "mealplan" | "blog";
 
-type RecipeSubTab = "main" | "dessert" | "mocktail";
+type RecipeSubTab = "main" | "dessert" | "mocktail" | "no-cook";
 
 const SPROCKET_STYLE: React.CSSProperties = {
   height: 22,
@@ -198,6 +198,14 @@ const RECIPE_SUB_TABS: { id: RecipeSubTab; label: string; icon: React.ReactNode;
     placeholder: "Search drinks (e.g. lassi, thandai, aam panna…)",
     emptyLabel: "No Drinks Found",
     tagline: "Refreshing Indian drinks, sharbats and mocktails",
+  },
+  {
+    id: "no-cook",
+    label: "No-Cook Recipes",
+    icon: <Zap size={15} />,
+    placeholder: "Search high-protein no-cook recipes…",
+    emptyLabel: "No Recipes Found",
+    tagline: "25 high-protein vegetarian recipes — zero heat, maximum nutrition",
   },
 ];
 
@@ -494,7 +502,7 @@ export default function HomePage() {
                 {sub.icon}
                 <span className="hidden sm:inline">{sub.label}</span>
                 <span className="sm:hidden">
-                  {sub.id === "main" ? "Dishes" : sub.id === "dessert" ? "Desserts" : "Drinks"}
+                  {sub.id === "main" ? "Dishes" : sub.id === "dessert" ? "Desserts" : sub.id === "mocktail" ? "Drinks" : "No-Cook"}
                 </span>
               </button>
             ))}

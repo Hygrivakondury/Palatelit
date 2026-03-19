@@ -3651,8 +3651,10 @@ const seedData = [
     cuisineType: "North Indian", dietaryTags: ["Vegan", "Gluten-Free"],
     imageUrl: null, authorId: null, youtubeUrl: yt("Temple Dal"),
   },
+];
 
-  // ── 25 HIGH-PROTEIN VEGETARIAN NO-COOK RECIPES ────────────────
+// ── 25 HIGH-PROTEIN VEGETARIAN NO-COOK RECIPES ────────────────
+const noCookSeedData = [
   {
     title: "Cottage Cheese & Hemp Bowl",
     description: "A quick, protein-packed no-cook bowl of creamy cottage cheese layered with nutty hemp hearts and cool cucumber — ready in 2 minutes and delivering 30g+ protein.",
@@ -3903,11 +3905,12 @@ export async function seedRecipes() {
       console.log(`[seed] Image URLs patched.`);
     }
 
-    // ── SEED: all recipe data (main + dessert + mocktail) ───────────
+    // ── SEED: all recipe data (main + dessert + mocktail + no-cook) ───────────
     const allSeedData = [
       ...seedData.map((r) => ({ ...r, category: "main" as const })),
       ...dessertSeedData,
       ...mocktailSeedData,
+      ...noCookSeedData.map((r) => ({ ...r, category: "no-cook" as const })),
     ];
 
     const existingTitles = new Set(allExisting.map((r) => r.title));
