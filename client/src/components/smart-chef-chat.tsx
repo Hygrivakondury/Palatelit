@@ -140,6 +140,26 @@ export function SmartChefChat({ recipeContext }: SmartChefChatProps) {
           } catch {}
         }
       }
+
+      // Auto-save general Q&A answers (not recipes) to the blog
+      if (full.length > 80 && !looksLikeRecipe(full)) {
+        fetch("/api/chef-chat/save-to-blog", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ question: trimmed, answer: full }),
+        })
+          .then((r) => r.ok && r.json())
+          .then((data) => {
+            if (data?.success) {
+              toast({
+                title: "Shared to Blog",
+                description: "Your question & Smart Chef's answer have been posted to the Blog.",
+              });
+            }
+          })
+          .catch(() => {});
+      }
     } catch (err: any) {
       if (err.name !== "AbortError") {
         setMessages((prev) => {
