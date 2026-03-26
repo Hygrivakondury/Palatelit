@@ -111,7 +111,8 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/switch-account", (req, res) => {
-    req.logout(() => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
       res.redirect("/api/login");
     });
   });
@@ -125,13 +126,13 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+    const endSessionUrl = client.buildEndSessionUrl(config, {
+      client_id: process.env.REPL_ID!,
+      post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+    }).href;
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.redirect(endSessionUrl);
     });
   });
 }
