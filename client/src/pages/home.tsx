@@ -22,7 +22,7 @@ import { BlogTab } from "@/components/blog-tab";
 import {
   Search, ChefHat, X, LogOut, Heart, Sparkles,
   SlidersHorizontal, UtensilsCrossed, Users, Trophy, ShoppingBag, CalendarDays,
-  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight, PenSquare, Zap,
+  Candy, GlassWater, MessageSquare, Loader2, ChevronLeft, ChevronRight, PenSquare, Zap, UserRoundPlus,
 } from "lucide-react";
 import type { Recipe, Favorite, UserProfile } from "@shared/schema";
 import logoImg from "@assets/Palate_Lit_1773224307175.jpg";
@@ -433,6 +433,11 @@ export default function HomePage() {
                     <ShoppingBag className="w-4 h-4" /> Smart Commerce
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem asChild>
+                  <a href="/api/switch-account" className="gap-2 cursor-pointer text-foreground focus:text-foreground" data-testid="menu-item-switch-account">
+                    <UserRoundPlus className="w-4 h-4" /> Switch Account
+                  </a>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <a href="/api/logout" className="gap-2 cursor-pointer text-destructive focus:text-destructive" data-testid="menu-item-logout">
                     <LogOut className="w-4 h-4" /> Sign Out
