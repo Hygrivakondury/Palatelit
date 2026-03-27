@@ -1,0 +1,127 @@
+Audit this entire project for migration out of Replit.
+
+I do NOT want generic advice. I want you to inspect the actual codebase, config files, routes, package files, environment references, database setup, auth, storage, media, deployment files, and all major dependencies.
+
+Your job:
+Create a complete migration audit for this project so I can safely move it out of Replit.
+
+Rules:
+- Be specific.
+- Use actual file names and locations wherever possible.
+- If something is unknown, say "Unknown" and tell me exactly where I should check.
+- If you infer something, label it as "Inference".
+- Do not skip sections.
+- Keep the answer practical and migration-focused.
+
+Please answer in this structure:
+
+1. Project identity
+- app name
+- purpose
+- project type
+- main features
+- top features that must not break
+
+2. Replit-specific setup
+- important Replit files found
+- anything Replit is handling automatically
+- anything that may break outside Replit
+
+3. Tech stack
+- frontend
+- backend
+- database
+- auth
+- storage
+- APIs/services
+- build tool
+- package manager
+- key libraries
+- supporting evidence from files
+
+4. Environment variables and secrets
+Make a table with:
+- variable name
+- where referenced
+- purpose
+- required/optional
+- frontend-safe or backend-only
+- whether I must manually copy the value from Replit
+
+5. Database and data
+- whether a database is used
+- connection location
+- ORM/query library
+- models/tables/entities
+- schema/migration files
+- what data must be exported before migration
+
+6. Assets and media
+Make a table with:
+- asset type
+- where stored
+- inside repo or external
+- must migrate yes/no
+- notes
+
+7. Pages, routes, and endpoints
+Make a table with:
+- route/page/endpoint
+- purpose
+- key dependencies
+- critical yes/no
+
+8. Feature inventory
+Make a table with:
+- feature
+- how it works technically
+- what it depends on
+- must migrate in phase 1 yes/no
+
+9. Runtime and dependencies
+- dependency files found
+- install/build/dev/start commands
+- runtime version
+- scripts
+- version risks outside Replit
+
+10. Best migration classification
+Classify this project as:
+- Option A: simple frontend/site
+- Option B: web app with database/auth
+- Option C: app needing custom backend/server logic
+
+Then recommend the best target:
+- Hostinger only
+- Vercel only
+- Vercel + Supabase
+- Vercel + Supabase + custom backend
+- other
+
+11. Step-by-step migration order
+Give the exact order to migrate this project, from backup to final testing.
+
+12. Acceptance test checklist
+Give me a practical checklist to test after migration.
+
+13. Top risks
+List the biggest migration risks for this specific project.
+
+14. Final readiness summary
+- readiness score /10
+- what is clear
+- what is unknown
+- what I must manually collect from Replit now
+- whether this is a good pilot before migrating Spotti
+
+15. Manual items to copy out of Replit immediately
+Give me a plain checklist of everything I should save right now:
+- env vars
+- API keys
+- database credentials
+- uploaded assets
+- domain settings
+- deployment settings
+- backup/export files
+
+Please base everything on the actual project files, not assumptions.
