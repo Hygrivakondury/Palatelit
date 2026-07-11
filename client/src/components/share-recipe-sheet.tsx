@@ -12,7 +12,7 @@ interface ShareRecipeSheetProps {
 }
 
 function buildShareUrl(recipeId: number): string {
-  return `${window.location.origin}/?recipe=${recipeId}`;
+  return `${window.location.origin}/recipe/${recipeId}`;
 }
 
 function buildShareText(recipe: Recipe): string {
