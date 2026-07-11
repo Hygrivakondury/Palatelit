@@ -45,6 +45,7 @@ export function getSession() {
       httpOnly: true,
       // secure requires HTTPS. Railway serves HTTPS in production.
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });

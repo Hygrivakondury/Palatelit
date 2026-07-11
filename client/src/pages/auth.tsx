@@ -31,8 +31,9 @@ export default function AuthPage() {
 
       await apiRequest("POST", url, body);
 
-      // refresh the auth state, then go into the app
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // refresh the auth state and WAIT for it before redirecting,
+      // so the home route sees the logged-in user immediately.
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: isLogin ? "Welcome back!" : "Account created",
         description: isLogin ? "You're now signed in." : "Your kitchen is ready.",
