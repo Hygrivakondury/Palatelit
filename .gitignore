@@ -12,3 +12,6 @@ attached_assets 2
 replit.nix
 palate-authfix/
 palate-authfix.zip
+palate-authfix/
+palate-overlay/
+*.zip
