@@ -1,0 +1,25 @@
+AUTH FIX — "signing in bounces back to landing page"
+=====================================================
+Root cause: the session cookie wasn't persisting on Railway's HTTPS
+(missing sameSite), plus the app cached the logged-out state too long.
+
+3 files changed. Same folder structure as your project — unzip on top.
+
+  server/replit_integrations/auth/localAuth.ts   (added sameSite: "lax" to cookie)
+  client/src/hooks/use-auth.ts                   (staleTime 0, refetch on focus)
+  client/src/pages/auth.tsx                      (awaits refetch before redirect)
+
+TO APPLY (Terminal):
+  1. Move this zip into your project and unzip over it:
+       mv ~/Downloads/palate-authfix.zip ~/Downloads/Palate-Lit/
+       cd ~/Downloads/Palate-Lit
+       unzip -o palate-authfix.zip
+  2. Commit and push (Railway auto-deploys):
+       git add -A
+       git commit -m "Fix session cookie persistence on HTTPS (sameSite) + auth refetch"
+       git push
+  3. Wait for Railway to redeploy (watch Deployments tab go green).
+  4. Hard-refresh the app (Cmd+Shift+R), sign in again.
+     This time it should take you INTO the app, not back to landing.
+
+  (You can delete palate-authfix.zip and _HOW-TO-USE.txt afterwards.)
