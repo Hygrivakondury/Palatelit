@@ -41,6 +41,7 @@ export function getSession() {
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    proxy: true, // Railway sits behind a proxy; needed for secure cookies to be set
     cookie: {
       httpOnly: true,
       // secure requires HTTPS. Railway serves HTTPS in production.
