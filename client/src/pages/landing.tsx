@@ -28,11 +28,18 @@ export default function LandingPage() {
             <a href="#cuisines" className="hover:text-foreground transition-colors">Cuisines</a>
             <a href="#community" className="hover:text-foreground transition-colors">Community</a>
           </div>
-          <a href="/auth">
-            <Button variant="default" size="sm" data-testid="button-login-nav" className="gap-2 font-medium">
-              Get Started <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="/auth">
+              <Button variant="ghost" size="sm" data-testid="button-login-nav" className="font-medium">
+                Log in
+              </Button>
+            </a>
+            <a href="/auth">
+              <Button variant="default" size="sm" data-testid="button-get-started-nav" className="gap-2 font-medium">
+                Get Started <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </a>
+          </div>
         </div>
       </nav>
 
