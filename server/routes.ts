@@ -42,8 +42,6 @@ function classifyMissing(recipeIngredient: string, pantrySet: Set<string>): "mai
 }
 
 const ADMIN_EMAILS = new Set([
-  "genieflavour@gmail.com",
-  "gurumurthy.sastry@gmail.com",
   "kondurhai@gmail.com",
 ]);
 
