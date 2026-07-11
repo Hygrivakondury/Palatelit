@@ -28,7 +28,7 @@ export default function LandingPage() {
             <a href="#cuisines" className="hover:text-foreground transition-colors">Cuisines</a>
             <a href="#community" className="hover:text-foreground transition-colors">Community</a>
           </div>
-          <a href="/api/login">
+          <a href="/auth">
             <Button variant="default" size="sm" data-testid="button-login-nav" className="gap-2 font-medium">
               Get Started <ArrowRight className="w-3.5 h-3.5" />
             </Button>
@@ -58,7 +58,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a href="/api/login">
+            <a href="/auth">
               <Button
                 size="lg"
                 data-testid="button-get-started-hero"
@@ -208,7 +208,7 @@ export default function LandingPage() {
           <p className="text-white/55 text-lg mb-10 leading-relaxed">
             {sc("cta_description")}
           </p>
-          <a href="/api/login">
+          <a href="/auth">
             <Button size="lg" data-testid="button-cta-final" className="gap-2 px-12 text-base font-semibold shadow-xl" style={{ height: "56px" }}>
               {sc("cta_button")} <ArrowRight className="w-4 h-4" />
             </Button>
