@@ -1,0 +1,31 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0K[seed] All 361 recipes already present.
+11:35:47 AM [express] serving on port 5000
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+11:35:59 AM [express] GET /api/auth/user 401 in 5ms :: {"message":"Unauthorized"}
+11:35:59 AM [express] GET /api/site-content 200 in 14ms :: {}
+11:38:02 AM [express] GET /api/site-content 304 in 22ms :: {}
+11:40:29 AM [express] GET /api/site-content 304 in 49ms :: {}
+11:41:02 AM [express] GET /api/auth/user 401 in 4ms :: {"message":"Unauthorized"}
+11:41:02 AM [express] GET /api/site-content 304 in 13ms :: {}
+11:45:19 AM [express] GET /api/site-content 304 in 48ms :: {}
+11:50:12 AM [express] GET /api/auth/user 401 in 39ms :: {"message":"Unauthorized"}
+11:50:13 AM [express] GET /api/site-content 304 in 15ms :: {}
+11:52:44 AM [express] GET /api/site-content 304 in 130ms :: {}
+11:56:07 AM [express] GET /api/auth/user 401 in 13ms :: {"message":"Unauthorized"}
+11:56:08 AM [express] GET /api/site-content 304 in 19ms :: {}
+12:00:57 PM [express] GET /api/site-content 304 in 25ms :: {}
+12:01:42 PM [express] GET /api/auth/user 401 in 15ms :: {"message":"Unauthorized"}
+12:07:35 PM [express] GET /api/auth/user 401 in 39ms :: {"message":"Unauthorized"}
+12:07:36 PM [express] GET /api/site-content 304 in 20ms :: {}
+12:12:11 PM [express] GET /api/site-content 304 in 47ms :: {}
+12:16:02 PM [express] GET /api/auth/user 401 in 98ms :: {"message":"Unauthorized"}
+12:16:02 PM [express] GET /api/site-content 304 in 13ms :: {}
+12:19:23 PM [express] GET /api/site-content 304 in 51ms :: {}
+12:21:29 PM [express] GET /api/auth/user 401 in 14ms :: {"message":"Unauthorized"}
+12:21:30 PM [express] GET /api/site-content 304 in 15ms :: {}
+12:25:13 PM [express] GET /api/site-content 304 in 47ms :: {}

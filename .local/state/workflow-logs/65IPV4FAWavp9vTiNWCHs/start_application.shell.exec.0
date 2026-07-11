@@ -1,0 +1,29 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K[seed] All 361 recipes already present.
+10:24:01 AM [express] serving on port 5000
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+10:24:07 AM [express] GET /api/auth/user 401 in 2ms :: {"message":"Unauthorized"}
+10:24:07 AM [express] GET /api/site-content 200 in 3ms :: {}
+10:24:07 AM [express] GET /api/auth/user 401 in 4ms :: {"message":"Unauthorized"}
+10:24:08 AM [express] GET /api/site-content 304 in 7ms :: {}
+10:24:43 AM [express] GET /api/auth/user 401 in 5ms :: {"message":"Unauthorized"}
+10:24:44 AM [express] GET /api/site-content 304 in 13ms :: {}
+10:25:00 AM [express] GET /api/login 302 in 16ms
+Internal Server Error: AuthorizationResponseError: authorization response from the server is an error
+    at Module.validateAuthResponse [90m(/home/runner/workspace/[39mnode_modules/[4moauth4webapi[24m/src/index.ts:5620:11[90m)[39m
+    at Module.authorizationCodeGrant [90m(/home/runner/workspace/[39mnode_modules/[4mopenid-client[24m/src/index.ts:3361:32[90m)[39m
+    at Strategy.authorizationCodeGrant [90m(/home/runner/workspace/[39mnode_modules/[4mopenid-client[24m/src/passport.ts:579:35[90m)[39m
+[90m    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)[39m {
+  cause: URLSearchParams {
+    [32m'error'[39m => [32m'invalid_request'[39m,
+    [32m'error_description'[39m => [32m'unsupported prompt value requested'[39m,
+    [32m'iss'[39m => [32m'https://replit.com/oidc'[39m },
+  code: [32m'OAUTH_AUTHORIZATION_RESPONSE_ERROR'[39m,
+  error: [32m'invalid_request'[39m,
+  error_description: [32m'unsupported prompt value requested'[39m
+}
+10:25:01 AM [express] GET /api/callback 500 in 32ms :: {"message":"authorization response from the server is an error"}

@@ -1,0 +1,6 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K[seed] All 336 recipes already present.
+2:49:38 PM [express] serving on port 5000
