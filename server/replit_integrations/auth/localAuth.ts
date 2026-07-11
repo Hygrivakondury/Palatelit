@@ -7,6 +7,7 @@ import connectPg from "connect-pg-simple";
 import { randomBytes, scrypt as _scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { authStorage } from "./storage";
+import { pool } from "../../db";
 
 const scrypt = promisify(_scrypt);
 
@@ -31,7 +32,7 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    pool: pool, // reuse the app's working DB pool instead of a separate connection
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
