@@ -179,7 +179,10 @@ export async function setupAuth(app: Express) {
 
       req.login(toSessionUser(user), (err) => {
         if (err) return next(err);
-        res.json({ id: user.id, email: user.email, firstName: user.firstName });
+        req.session.save((saveErr) => {
+          if (saveErr) return next(saveErr);
+          res.json({ id: user.id, email: user.email, firstName: user.firstName });
+        });
       });
     } catch (err) {
       next(err);
@@ -193,10 +196,15 @@ export async function setupAuth(app: Express) {
       if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
       req.login(user, (loginErr) => {
         if (loginErr) return next(loginErr);
-        res.json({
-          id: user.claims.sub,
-          email: user.claims.email,
-          firstName: user.claims.first_name,
+        // Explicitly persist the session to the store BEFORE responding,
+        // so the cookie the client receives points to a session that exists.
+        req.session.save((saveErr) => {
+          if (saveErr) return next(saveErr);
+          res.json({
+            id: user.claims.sub,
+            email: user.claims.email,
+            firstName: user.claims.first_name,
+          });
         });
       });
     })(req, res, next);
@@ -235,8 +243,13 @@ export async function setupAuth(app: Express) {
 
 // ─── Route guard (same name/signature the app already imports) ──────────────
 export const isAuthenticated: RequestHandler = (req, res, next) => {
-  if (req.isAuthenticated && req.isAuthenticated() && (req.user as any)?.claims?.sub) {
-    return next();
-  }
+  const authed = !!(req.isAuthenticated && req.isAuthenticated() && (req.user as any)?.claims?.sub);
+  // Diagnostic (visible in Railway deploy logs) — helps confirm session flow
+  console.log(
+    `[auth] ${req.method} ${req.path} authed=${authed} ` +
+    `sid=${req.sessionID ? req.sessionID.slice(0, 8) : "none"} ` +
+    `hasCookie=${!!req.headers.cookie}`
+  );
+  if (authed) return next();
   return res.status(401).json({ message: "Unauthorized" });
 };
