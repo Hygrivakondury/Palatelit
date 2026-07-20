@@ -314,8 +314,9 @@ RULES:
           },
           { role: "user", content: JSON.stringify(payload) },
         ],
-        max_tokens: 2000,
+        max_tokens: 3000,
         temperature: 0.2,
+        response_format: { type: "json_object" },
       });
 
       const raw = completion.choices[0]?.message?.content ?? "{}";
@@ -348,9 +349,9 @@ RULES:
         instructions: translated.instructions,
         cached: false,
       });
-    } catch (err) {
-      console.error("Translation error:", err);
-      return res.status(500).json({ message: "Translation failed" });
+    } catch (err: any) {
+      console.error("Translation error:", err?.message || err, err?.response?.data || "");
+      return res.status(500).json({ message: "Translation failed", detail: err?.message || String(err) });
     }
   });
 
