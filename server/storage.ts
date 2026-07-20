@@ -1,6 +1,6 @@
 import {
   recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
-  blogPosts, blogComments, adSlots, siteContent,
+  blogPosts, blogComments, adSlots, siteContent, recipeTranslations,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
   type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
   type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
@@ -151,6 +151,33 @@ export class DatabaseStorage implements IStorage {
     // Full select including imageData for single-recipe detail views
     const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
     return recipe;
+  }
+
+  async getRecipeTranslation(recipeId: number, language: string) {
+    const [t] = await db
+      .select()
+      .from(recipeTranslations)
+      .where(and(eq(recipeTranslations.recipeId, recipeId), eq(recipeTranslations.language, language)));
+    return t;
+  }
+
+  async saveRecipeTranslation(data: {
+    recipeId: number;
+    language: string;
+    title: string;
+    description: string;
+    ingredients: string[];
+    instructions: string[];
+  }) {
+    const [saved] = await db
+      .insert(recipeTranslations)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [recipeTranslations.recipeId, recipeTranslations.language],
+        set: { ...data, updatedAt: new Date() },
+      })
+      .returning();
+    return saved;
   }
 
   async getRecipeImageData(id: number): Promise<string | null> {

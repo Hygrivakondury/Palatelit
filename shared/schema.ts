@@ -9,6 +9,22 @@ export * from "./models/chat";
 export const RECIPE_CATEGORIES = ["main", "dessert", "mocktail", "no-cook"] as const;
 export type RecipeCategory = typeof RECIPE_CATEGORIES[number];
 
+// ── Recipe translations (on-demand, cached) ──────────────────────────────
+export const recipeTranslations = pgTable("recipe_translations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  recipeId: integer("recipe_id").notNull(),
+  language: varchar("language", { length: 5 }).notNull(), // hi te kn ta ml gu mr bn
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  ingredients: text("ingredients").array().notNull(),
+  instructions: text("instructions").array().notNull(),
+  status: varchar("status", { length: 12 }).notNull().default("auto"), // auto | reviewed | locked
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqRecipeLang: unique().on(table.recipeId, table.language),
+}));
+
 export const recipes = pgTable("recipes", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title: text("title").notNull(),

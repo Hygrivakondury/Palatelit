@@ -246,6 +246,114 @@ export async function registerRoutes(
     }
   });
 
+  // ── Supported languages for on-demand recipe translation ────────────────
+  const SUPPORTED_LANGUAGES: Record<string, string> = {
+    hi: "Hindi", te: "Telugu", kn: "Kannada", ta: "Tamil",
+    ml: "Malayalam", gu: "Gujarati", mr: "Marathi", bn: "Bengali",
+  };
+
+  // Public: get a recipe in a target language (translate-on-demand + cache)
+  app.get("/api/recipes/:id/translation/:lang", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const lang = req.params.lang;
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid recipe id" });
+
+      // English = original, no translation needed
+      if (lang === "en") {
+        const original = await storage.getRecipe(id);
+        if (!original) return res.status(404).json({ message: "Recipe not found" });
+        return res.json({
+          language: "en",
+          title: original.title,
+          description: original.description,
+          ingredients: original.ingredients,
+          instructions: original.instructions,
+        });
+      }
+
+      const languageName = SUPPORTED_LANGUAGES[lang];
+      if (!languageName) return res.status(400).json({ message: "Unsupported language" });
+
+      // 1. Cache hit?
+      const cached = await storage.getRecipeTranslation(id, lang);
+      if (cached) {
+        return res.json({
+          language: lang,
+          title: cached.title,
+          description: cached.description,
+          ingredients: cached.ingredients,
+          instructions: cached.instructions,
+          cached: true,
+        });
+      }
+
+      // 2. No cache — fetch original, translate, save, serve
+      const recipe = await storage.getRecipe(id);
+      if (!recipe) return res.status(404).json({ message: "Recipe not found" });
+
+      const payload = {
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+      };
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional culinary translator. Translate the given Indian vegetarian recipe into ${languageName}.
+RULES:
+- Translate title, description, each ingredient, and each instruction into natural, everyday ${languageName} as an Indian home cook would say it.
+- Keep quantities and numbers (e.g. "200g", "2 cups", "1/2 tsp") exactly as-is; translate only the surrounding words.
+- Preserve cooking accuracy precisely — do NOT change times, temperatures, or steps.
+- Keep well-known ingredient names natural (use the common ${languageName} term; transliterate if there is no local word).
+- Return ONLY a valid raw JSON object with fields: title (string), description (string), ingredients (string[]), instructions (string[]). Same array lengths as input. No markdown, no extra text.`,
+          },
+          { role: "user", content: JSON.stringify(payload) },
+        ],
+        max_tokens: 2000,
+        temperature: 0.2,
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? "{}";
+      let translated: any;
+      try {
+        translated = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      } catch {
+        return res.status(502).json({ message: "Translation failed to parse" });
+      }
+
+      if (!translated.title || !Array.isArray(translated.ingredients) || !Array.isArray(translated.instructions)) {
+        return res.status(502).json({ message: "Incomplete translation" });
+      }
+
+      // 3. Cache it
+      await storage.saveRecipeTranslation({
+        recipeId: id,
+        language: lang,
+        title: translated.title,
+        description: translated.description || "",
+        ingredients: translated.ingredients,
+        instructions: translated.instructions,
+      });
+
+      return res.json({
+        language: lang,
+        title: translated.title,
+        description: translated.description || "",
+        ingredients: translated.ingredients,
+        instructions: translated.instructions,
+        cached: false,
+      });
+    } catch (err) {
+      console.error("Translation error:", err);
+      return res.status(500).json({ message: "Translation failed" });
+    }
+  });
+
   app.get("/api/recipes/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
