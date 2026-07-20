@@ -10,6 +10,7 @@ import {
   Lightbulb, RefreshCw, RotateCcw, WandSparkles, Clock, Users,
 } from "lucide-react";
 import type { PantryItem, Recipe } from "@shared/schema";
+import { PantryPickMix } from "@/components/pantry-pick-mix";
 
 interface RecipeSuggestion {
   recipe: Recipe;
@@ -531,6 +532,13 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
           />
         </div>
       </div>
+
+      {/* Pick & Mix visual ingredient grid */}
+      <PantryPickMix
+        existingNames={pantry.map((p) => p.name)}
+        onAddItems={(names) => addItemsMutation.mutate(names)}
+        isAdding={addItemsMutation.isPending}
+      />
 
       {/* Analyzing indicator */}
       {analyzePhotoMutation.isPending && (
