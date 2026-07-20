@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Clock, Users, ChefHat, CheckCircle2, Flame, Heart, Star,
-  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink, Share2, RefreshCw
+  Minus, Plus, Camera, Upload, Loader2, MessageSquare, X, Youtube, ShoppingBag, ExternalLink, Share2, RefreshCw, Globe, Check
 } from "lucide-react";
 import type { Recipe, Review, AffiliateLink } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -83,6 +83,42 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
   const [hoveredStar, setHoveredStar] = useState(0);
   const [activeTab, setActiveTab] = useState<"ingredients" | "instructions" | "reviews">("ingredients");
   const [showShare, setShowShare] = useState(false);
+
+  // ── Language / translation (same engine as public recipe page) ──────────
+  const RECIPE_LANGUAGES: { code: string; label: string }[] = [
+    { code: "en", label: "English" },
+    { code: "hi", label: "हिन्दी" },
+    { code: "te", label: "తెలుగు" },
+    { code: "kn", label: "ಕನ್ನಡ" },
+    { code: "ta", label: "தமிழ்" },
+    { code: "ml", label: "മലയാളം" },
+    { code: "gu", label: "ગુજરાતી" },
+    { code: "mr", label: "मराठी" },
+    { code: "bn", label: "বাংলা" },
+  ];
+  const [recipeLang, setRecipeLang] = useState("en");
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+
+  const { data: recipeTranslation, isFetching: recipeTranslating } = useQuery<{
+    title: string; description: string; ingredients: string[]; instructions: string[];
+  }>({
+    queryKey: [`/api/recipes/${recipe.id}/translation/${recipeLang}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/recipes/${recipe.id}/translation/${recipeLang}`);
+      if (!res.ok) throw new Error("Translation unavailable");
+      return res.json();
+    },
+    enabled: recipeLang !== "en",
+    retry: false,
+    staleTime: Infinity,
+  });
+
+  const showTranslated = recipeLang !== "en" && recipeTranslation && !recipeTranslating;
+  const tTitle = showTranslated ? recipeTranslation!.title : recipe.title;
+  const tDescription = showTranslated ? recipeTranslation!.description : recipe.description;
+  const tIngredients = showTranslated ? recipeTranslation!.ingredients : recipe.ingredients;
+  const tInstructions = showTranslated ? recipeTranslation!.instructions : recipe.instructions;
+  const currentLangLabel = RECIPE_LANGUAGES.find((l) => l.code === recipeLang)?.label || "English";
 
   const emoji = cuisineEmojis[recipe.cuisineType] ?? "🍽️";
   const scale = selectedServings / recipe.servings;
@@ -341,7 +377,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
             <DialogHeader className="space-y-2 text-left">
               <div className="flex items-start justify-between gap-3">
                 <DialogTitle className="font-serif text-2xl font-bold text-foreground leading-snug flex-1">
-                  {recipe.title}
+                  {tTitle}
                 </DialogTitle>
                 {avgRating && (
                   <div className="flex items-center gap-1 flex-shrink-0 bg-accent rounded-lg px-2.5 py-1">
@@ -351,7 +387,42 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                   </div>
                 )}
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">{recipe.description}</p>
+              <p className="text-muted-foreground text-sm leading-relaxed">{tDescription}</p>
+              {/* Language switcher */}
+              <div className="relative pt-1">
+                <button
+                  type="button"
+                  onClick={() => setLangMenuOpen((o) => !o)}
+                  data-testid="button-modal-language"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs hover:bg-muted transition-colors"
+                >
+                  <Globe className="w-3 h-3 text-primary" />
+                  <span>{currentLangLabel}</span>
+                  {recipeTranslating && <span className="w-2.5 h-2.5 rounded-full border-[1.5px] border-primary border-t-transparent animate-spin ml-0.5" />}
+                </button>
+                {langMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
+                    <div className="absolute left-0 mt-1.5 w-40 rounded-xl border border-border bg-background shadow-lg z-50 py-1.5 max-h-72 overflow-auto">
+                      {RECIPE_LANGUAGES.map((l) => (
+                        <button
+                          key={l.code}
+                          type="button"
+                          data-testid={`modal-lang-${l.code}`}
+                          onClick={() => { setRecipeLang(l.code); setLangMenuOpen(false); }}
+                          className="w-full flex items-center justify-between px-4 py-1.5 text-sm hover:bg-muted transition-colors text-left"
+                        >
+                          <span>{l.label}</span>
+                          {recipeLang === l.code && <Check className="w-3.5 h-3.5 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {showTranslated && (
+                <p className="text-[11px] text-muted-foreground/60 italic">Auto-translated — quantities & times preserved</p>
+              )}
             </DialogHeader>
 
             {/* Admin: Move to Tab */}
@@ -529,7 +600,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                   )}
                 </div>
                 <div className="grid sm:grid-cols-2 gap-2">
-                  {recipe.ingredients.map((ingredient, i) => (
+                  {tIngredients.map((ingredient, i) => (
                     <div
                       key={i}
                       data-testid={`ingredient-${i}`}
@@ -552,7 +623,7 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
                   <span className="text-xs text-muted-foreground ml-auto">{recipe.instructions.length} steps</span>
                 </div>
                 <ol className="space-y-4">
-                  {recipe.instructions.map((step, i) => (
+                  {tInstructions.map((step, i) => (
                     <li key={i} data-testid={`step-${i + 1}`} className="flex gap-4">
                       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5">
                         {i + 1}
