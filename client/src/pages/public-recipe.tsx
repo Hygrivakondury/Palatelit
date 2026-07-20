@@ -1,12 +1,40 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Clock, Users, ChefHat, ArrowRight, Sparkles } from "lucide-react";
+import { Clock, Users, ChefHat, ArrowRight, Sparkles, Globe, Check } from "lucide-react";
 import type { Recipe } from "@shared/schema";
+
+// Supported languages shown in their own script
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "te", label: "తెలుగు" },
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "ml", label: "മലയാളം" },
+  { code: "gu", label: "ગુજરાતી" },
+  { code: "mr", label: "मराठी" },
+  { code: "bn", label: "বাংলা" },
+];
+
+interface TranslatedFields {
+  language: string;
+  title: string;
+  description: string;
+  ingredients: string[];
+  instructions: string[];
+}
 
 async function fetchPublicRecipe(id: string): Promise<Recipe> {
   const res = await fetch(`/api/recipes/${id}`);
   if (!res.ok) throw new Error("Recipe not found");
+  return res.json();
+}
+
+async function fetchTranslation(id: string, lang: string): Promise<TranslatedFields> {
+  const res = await fetch(`/api/recipes/${id}/translation/${lang}`);
+  if (!res.ok) throw new Error("Translation unavailable");
   return res.json();
 }
 
@@ -15,11 +43,23 @@ export default function PublicRecipePage() {
   const [, setLocation] = useLocation();
   const id = params?.id;
 
+  const [lang, setLang] = useState<string>("en");
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const { data: recipe, isLoading, isError } = useQuery<Recipe>({
     queryKey: [`/api/recipes/${id}`],
     queryFn: () => fetchPublicRecipe(id!),
     enabled: !!id,
     retry: false,
+  });
+
+  // Translation query — only runs when a non-English language is selected
+  const { data: translated, isFetching: translating } = useQuery<TranslatedFields>({
+    queryKey: [`/api/recipes/${id}/translation/${lang}`],
+    queryFn: () => fetchTranslation(id!, lang),
+    enabled: !!id && lang !== "en",
+    retry: false,
+    staleTime: Infinity, // cached server-side; no need to refetch
   });
 
   if (isLoading) {
@@ -44,21 +84,69 @@ export default function PublicRecipePage() {
 
   const totalTime = recipe.prepTime + recipe.cookTime;
 
+  // Choose displayed content: translated version if available & selected, else original
+  const useTranslated = lang !== "en" && translated && !translating;
+  const displayTitle = useTranslated ? translated!.title : recipe.title;
+  const displayDescription = useTranslated ? translated!.description : recipe.description;
+  const displayIngredients = useTranslated ? translated!.ingredients : recipe.ingredients;
+  const displayInstructions = useTranslated ? translated!.instructions : recipe.instructions;
+
+  const currentLangLabel = LANGUAGES.find((l) => l.code === lang)?.label || "English";
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top brand bar */}
       <div className="border-b border-border bg-white/90 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between gap-3">
           <a href="/" className="flex items-center gap-2">
             <span className="font-serif text-lg font-bold text-foreground">
               Palate <strong className="text-primary">Lit</strong>
             </span>
           </a>
-          <a href="/auth">
-            <Button size="sm" className="rounded-full gap-1.5 font-medium">
-              Join free <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </a>
+
+          <div className="flex items-center gap-2">
+            {/* Language switcher */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                data-testid="button-language"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              >
+                <Globe className="w-3.5 h-3.5 text-primary" />
+                <span className="max-w-[7rem] truncate">{currentLangLabel}</span>
+              </button>
+              {menuOpen && (
+                <>
+                  {/* click-away backdrop */}
+                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-44 rounded-xl border border-border bg-white shadow-lg z-50 py-1.5 max-h-80 overflow-auto">
+                    {LANGUAGES.map((l) => (
+                      <button
+                        key={l.code}
+                        type="button"
+                        data-testid={`lang-${l.code}`}
+                        onClick={() => {
+                          setLang(l.code);
+                          setMenuOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-muted transition-colors text-left"
+                      >
+                        <span>{l.label}</span>
+                        {lang === l.code && <Check className="w-3.5 h-3.5 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <a href="/auth">
+              <Button size="sm" className="rounded-full gap-1.5 font-medium">
+                Join free <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -85,18 +173,30 @@ export default function PublicRecipePage() {
         {/* Image */}
         {recipe.imageUrl && (
           <div className="w-full aspect-[16/10] rounded-2xl overflow-hidden mb-6 bg-muted">
-            <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
+            <img src={recipe.imageUrl} alt={displayTitle} className="w-full h-full object-cover" />
+          </div>
+        )}
+
+        {/* Translating indicator */}
+        {lang !== "en" && translating && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+            <div className="w-3.5 h-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            Translating to {currentLangLabel}…
           </div>
         )}
 
         {/* Title + meta */}
-        <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-3">{recipe.title}</h1>
-        <p className="text-muted-foreground leading-relaxed mb-2">{recipe.description}</p>
+        <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-3">{displayTitle}</h1>
+        <p className="text-muted-foreground leading-relaxed mb-2">{displayDescription}</p>
         {recipe.submittedByName && (
-          <p className="text-sm text-muted-foreground mb-6">
+          <p className="text-sm text-muted-foreground mb-2">
             Recipe by <span className="font-medium text-foreground">{recipe.submittedByName}</span>
           </p>
         )}
+        {useTranslated && (
+          <p className="text-xs text-muted-foreground/70 italic mb-6">Auto-translated — quantities & times preserved</p>
+        )}
+        {!useTranslated && <div className="mb-6" />}
 
         {/* Meta chips */}
         <div className="flex flex-wrap gap-3 mb-8">
@@ -115,7 +215,7 @@ export default function PublicRecipePage() {
         <section className="mb-8">
           <h2 className="font-serif text-xl font-bold text-foreground mb-4">Ingredients</h2>
           <ul className="space-y-2">
-            {recipe.ingredients.map((ing, i) => (
+            {displayIngredients.map((ing, i) => (
               <li key={i} className="flex items-start gap-3 text-foreground/90">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
                 {ing}
@@ -128,7 +228,7 @@ export default function PublicRecipePage() {
         <section className="mb-10">
           <h2 className="font-serif text-xl font-bold text-foreground mb-4">Instructions</h2>
           <ol className="space-y-4">
-            {recipe.instructions.map((step, i) => (
+            {displayInstructions.map((step, i) => (
               <li key={i} className="flex gap-4">
                 <span className="shrink-0 w-7 h-7 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">
                   {i + 1}
