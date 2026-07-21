@@ -52,6 +52,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const [generatingImageFor, setGeneratingImageFor] = useState<number | null>(null);
   const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
   const [expandedAiSteps, setExpandedAiSteps] = useState(false);
+  const [recipeIdea, setRecipeIdea] = useState("");
 
   // Camera modal state
   const [showCamera, setShowCamera] = useState(false);
@@ -253,6 +254,35 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
       setExpandedAiSteps(false);
     },
   });
+
+  const generateFromIdeaMutation = useMutation({
+    mutationFn: async (idea: string) => {
+      const res = await fetch("/api/pantry/generate-from-idea", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Failed to generate recipe from idea");
+      }
+      return res.json() as Promise<{ recipe: AIGeneratedRecipe }>;
+    },
+    onSuccess: (data) => {
+      setAiRecipe(data.recipe);
+      setExpandedAiSteps(false);
+    },
+  });
+
+  const handleGenerateFromIdea = () => {
+    const trimmed = recipeIdea.trim();
+    if (trimmed.length < 2) return;
+    setSuggestions([]);
+    setHasSuggested(false);
+    setAiRecipe(null);
+    generateFromIdeaMutation.mutate(trimmed);
+  };
 
   const handleFindRecipes = () => {
     setAiRecipe(null);
@@ -539,6 +569,50 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
         onAddItems={(names) => addItemsMutation.mutate(names)}
         isAdding={addItemsMutation.isPending}
       />
+
+      {/* Have a recipe idea? — generate a recipe from a text description */}
+      <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-1">
+          <Lightbulb size={16} className="text-amber-500" />
+          <h3 className="font-semibold text-neutral-800 dark:text-neutral-100 text-sm">Have a recipe idea?</h3>
+        </div>
+        <p className="text-xs text-neutral-400 dark:text-neutral-500 mb-3">
+          Describe a dish and Palate Lit will create the recipe.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            value={recipeIdea}
+            onChange={(e) => setRecipeIdea(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleGenerateFromIdea();
+            }}
+            placeholder="e.g. spicy paneer wrap, low-oil moong dal chilla…"
+            maxLength={200}
+            disabled={generateFromIdeaMutation.isPending}
+            className="flex-1"
+            data-testid="input-recipe-idea"
+          />
+          <Button
+            onClick={handleGenerateFromIdea}
+            disabled={generateFromIdeaMutation.isPending || recipeIdea.trim().length < 2}
+            className="bg-primary hover:bg-primary/90 sm:w-auto w-full"
+            data-testid="button-generate-from-idea"
+          >
+            {generateFromIdeaMutation.isPending ? (
+              <Loader2 size={15} className="animate-spin mr-1.5" />
+            ) : (
+              <WandSparkles size={15} className="mr-1.5" />
+            )}
+            Generate
+          </Button>
+        </div>
+        {generateFromIdeaMutation.isError && (
+          <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+            <AlertCircle size={12} />
+            {(generateFromIdeaMutation.error as Error)?.message ?? "Something went wrong. Try again."}
+          </p>
+        )}
+      </div>
 
       {/* Analyzing indicator */}
       {analyzePhotoMutation.isPending && (
