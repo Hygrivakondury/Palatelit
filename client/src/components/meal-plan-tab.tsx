@@ -194,6 +194,35 @@ function buildShoppingList(allWeekRecipes: Recipe[]): ShoppingItem[] {
   return Array.from(map.values());
 }
 
+// ─── Amazon affiliate: which items are worth a "Buy" link ────
+// Category-based (cleaner than per-item guessing): shelf-stable categories
+// get a link; fresh/perishable ones don't. Ghee is a Dairy-categorized
+// exception that IS shelf-stable, so we allow it.
+const AMAZON_TAG = "veggenie-21";
+const AMAZON_DOMAIN = "https://www.amazon.in";
+
+const BUYABLE_CATEGORIES: Set<ShoppingCategory> = new Set([
+  "Grains & Pulses",
+  "Nuts & Dry Fruits",
+  "Oils & Condiments",
+]);
+
+// Shelf-stable items that fall in an otherwise-fresh category (e.g. ghee is Dairy).
+const BUYABLE_EXCEPTIONS = ["ghee"];
+// Perishable items that fall in a buyable category and should NOT be linked.
+const NON_BUYABLE_EXCEPTIONS = ["bread", "noodle", "pasta", "fresh"];
+
+function isBuyable(item: ShoppingItem): boolean {
+  const k = item.key.toLowerCase();
+  if (NON_BUYABLE_EXCEPTIONS.some((w) => k.includes(w))) return false;
+  if (BUYABLE_EXCEPTIONS.some((w) => k.includes(w))) return true;
+  return BUYABLE_CATEGORIES.has(item.category);
+}
+
+function amazonSearchUrl(term: string): string {
+  return `${AMAZON_DOMAIN}/s?k=${encodeURIComponent(term)}&tag=${AMAZON_TAG}`;
+}
+
 // ─── Component ───────────────────────────────────────────────
 
 interface MealPlanTabProps {
@@ -671,32 +700,70 @@ export function MealPlanTab({ onViewRecipe }: MealPlanTabProps) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                         {items.map((item) => {
                           const checked = checkedKeys.has(item.key);
+                          const buyable = isBuyable(item);
                           return (
-                            <button
+                            <div
                               key={item.key}
-                              data-testid={`shopping-item-${item.key}`}
-                              onClick={() => toggleCheckMutation.mutate(item.key)}
-                              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-sm transition-colors ${
+                              className={`flex items-center gap-1 rounded-lg transition-colors ${
                                 checked
-                                  ? "bg-neutral-50 dark:bg-neutral-700/50 text-neutral-400 dark:text-neutral-500 line-through"
-                                  : "hover:bg-neutral-50 dark:hover:bg-neutral-700/50 text-neutral-700 dark:text-neutral-200"
+                                  ? "bg-neutral-50 dark:bg-neutral-700/50"
+                                  : "hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
                               }`}
                             >
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                                checked
-                                  ? "bg-primary border-primary"
-                                  : "border-neutral-300 dark:border-neutral-500"
-                              }`}>
-                                {checked && <Check size={10} className="text-white" />}
-                              </div>
-                              <span className="truncate text-[13px]">{item.display}</span>
-                            </button>
+                              <button
+                                data-testid={`shopping-item-${item.key}`}
+                                onClick={() => toggleCheckMutation.mutate(item.key)}
+                                className={`flex items-center gap-2.5 px-3 py-2.5 text-left text-sm flex-1 min-w-0 ${
+                                  checked
+                                    ? "text-neutral-400 dark:text-neutral-500 line-through"
+                                    : "text-neutral-700 dark:text-neutral-200"
+                                }`}
+                              >
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                  checked
+                                    ? "bg-primary border-primary"
+                                    : "border-neutral-300 dark:border-neutral-500"
+                                }`}>
+                                  {checked && <Check size={10} className="text-white" />}
+                                </div>
+                                <span className="truncate text-[13px]">{item.display}</span>
+                              </button>
+                              {buyable && !checked && (
+                                <a
+                                  href={amazonSearchUrl(item.key)}
+                                  target="_blank"
+                                  rel="noopener noreferrer sponsored"
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`shopping-buy-${item.key}`}
+                                  title={`Buy ${item.display} on Amazon`}
+                                  className="flex-shrink-0 mr-2 text-primary hover:text-primary/80 transition-colors"
+                                >
+                                  <ShoppingCart size={14} />
+                                </a>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
                     </div>
                   );
                 })}
+                {shoppingList.some(isBuyable) && (
+                  <div className="px-5 pb-4 pt-1">
+                    <a
+                      href={amazonSearchUrl("indian cooking essentials dal spices ghee")}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl py-3 text-sm font-medium transition-colors"
+                    >
+                      <ShoppingCart size={15} />
+                      Shop pantry staples on Amazon
+                    </a>
+                    <p className="text-[11px] text-neutral-400 dark:text-neutral-500 text-center mt-2">
+                      As an Amazon Associate, Palate Lit earns from qualifying purchases.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
