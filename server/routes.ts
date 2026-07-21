@@ -969,6 +969,58 @@ additionalIngredients should list any extra ingredients needed beyond the pantry
     }
   });
 
+  // Generate a recipe from a free-text idea (e.g. "spicy paneer wrap")
+  app.post("/api/pantry/generate-from-idea", isAuthenticated, async (req: any, res) => {
+    try {
+      const rawIdea = typeof req.body?.idea === "string" ? req.body.idea.trim() : "";
+      if (rawIdea.length < 2) {
+        return res.status(400).json({ message: "Please describe a dish or idea" });
+      }
+      // Cap length to keep prompt tidy and predictable
+      const idea = rawIdea.slice(0, 200);
+
+      const prompt = `You are an expert Indian vegetarian recipe creator. A user wants a recipe based on this idea: "${idea}".
+
+Create ONE original, delicious Indian vegetarian recipe that matches this idea as closely as possible. The recipe must be 100% vegetarian (no meat, fish, or eggs). If the idea mentions meat, fish, or eggs, create a vegetarian version instead.
+
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "title": "Recipe Name",
+  "description": "One or two sentence description of the dish",
+  "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
+  "instructions": ["Step 1", "Step 2", "Step 3"],
+  "prepTime": 15,
+  "cookTime": 25,
+  "servings": 4,
+  "cuisineType": "North Indian",
+  "dietaryTags": ["Vegan"],
+  "pantryIngredients": [],
+  "additionalIngredients": ["all ingredients needed for this recipe"]
+}
+
+dietaryTags must be an array containing only items from: ["Vegan", "Gluten-Free", "Jain Friendly"] — only include if truly applicable.
+cuisineType must be one of: North Indian, South Indian, Gujarati, Punjabi, Bengali, Rajasthani, Maharashtrian, Pan-Indian, East Indian, West Indian, Fusion.
+pantryIngredients must be an empty array (this recipe is from an idea, not a pantry).
+additionalIngredients should list all the ingredients needed for this recipe.`;
+
+      const aiResponse = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+        temperature: 0.8,
+      });
+
+      const raw = aiResponse.choices[0]?.message?.content ?? "{}";
+      const parsed = JSON.parse(raw);
+
+      res.json({ recipe: parsed });
+    } catch (err) {
+      console.error("AI idea recipe generation error:", err);
+      res.status(500).json({ message: "Failed to generate recipe from idea" });
+    }
+  });
+
   // ─── MEAL PLANS ────────────────────────────────────────────────
   app.get("/api/meal-plans", isAuthenticated, async (req: any, res) => {
     try {
