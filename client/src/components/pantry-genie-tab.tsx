@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { PantryItem, Recipe } from "@shared/schema";
 import { PantryPickMix } from "@/components/pantry-pick-mix";
+import { PantryShoppingList } from "@/components/pantry-shopping-list";
 
 interface RecipeSuggestion {
   recipe: Recipe;
@@ -860,6 +861,13 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
             ))
           )}
         </div>
+      )}
+
+      {/* ── SHOPPING LIST: missing ingredients → Amazon (staples only) ── */}
+      {hasSuggested && suggestions.length > 0 && (
+        <PantryShoppingList
+          missingItems={suggestions.flatMap((s) => [...s.missingMain, ...s.missingSpices])}
+        />
       )}
 
       {/* ── SECTION 2: AI-Generated Recipe ── */}
