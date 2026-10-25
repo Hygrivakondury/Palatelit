@@ -1206,9 +1206,14 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
         }
         return false; // data URLs and external URLs are fine
       });
-      console.log(`[admin] Generating images for ${missing.length} recipes without valid pictures`);
-      res.json({ triggered: missing.length });
-      for (const r of missing) {
+      // Optional batch limit to control OpenAI image-generation cost.
+      // POST { "limit": 25 } to generate only the next 25; omit for all.
+      const rawLimit = Number(req.body?.limit);
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : missing.length;
+      const batch = missing.slice(0, limit);
+      console.log(`[admin] Generating images for ${batch.length} of ${missing.length} recipes without valid pictures`);
+      res.json({ triggered: batch.length, remaining: missing.length - batch.length });
+      for (const r of batch) {
         await generateAndSaveRecipeImage(r.id, r.title);
       }
     } catch (err) {

@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { dessertSeedData } from "./seed-desserts";
 import { mocktailSeedData } from "./seed-mocktails";
+import { regionalSeedData } from "./seed-regional";
 
 function yt(title: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " recipe indian vegetarian")}`;
@@ -4138,6 +4139,7 @@ export async function seedRecipes() {
       ...dessertSeedData,
       ...mocktailSeedData,
       ...noCookSeedData.map((r) => ({ ...r, category: "no-cook" as const })),
+      ...regionalSeedData,
     ];
 
     const existingTitles = new Set(allExisting.map((r) => r.title));
@@ -4150,9 +4152,16 @@ export async function seedRecipes() {
 
     console.log(`[seed] Adding ${toSeed.length} new recipes (${allExisting.length} already exist)...`);
     for (const recipe of toSeed) {
+      // Regional/community recipes carry their own imageUrl (null) — leave them
+      // imageless so the UI shows a placeholder and images can be generated later
+      // from the admin panel, in batches, on demand. Core seed recipes still map
+      // to their bundled stock image.
+      const imageUrl = (recipe as any).isUserSubmitted
+        ? (recipe as any).imageUrl ?? null
+        : recipeImageUrl(recipe.title);
       await storage.createRecipe({
         ...recipe,
-        imageUrl: recipeImageUrl(recipe.title),
+        imageUrl,
       } as any);
     }
     console.log(`[seed] Successfully added ${toSeed.length} recipes. Total now: ${allExisting.length + toSeed.length}`);
