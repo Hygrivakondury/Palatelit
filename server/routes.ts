@@ -1212,16 +1212,24 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
         }
         return false; // data URLs and external URLs are fine
       });
-      // Optional batch limit to control OpenAI image-generation cost.
-      // POST { "limit": 25 } to generate only the next 25; omit for all.
+      // Resilient batching: process a SMALL batch synchronously (before sending
+      // the response) so the work can't be lost to a container restart the way a
+      // fire-and-forget background loop can. The client calls this repeatedly
+      // until remaining === 0; "missing" is recomputed from the DB each call, so
+      // a restart mid-run simply resumes from wherever the DB left off.
+      // POST { "limit": N } to cap this call's batch (default 10).
       const rawLimit = Number(req.body?.limit);
-      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : missing.length;
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 10;
       const batch = missing.slice(0, limit);
       console.log(`[admin] Generating images for ${batch.length} of ${missing.length} recipes without valid pictures`);
-      res.json({ triggered: batch.length, remaining: missing.length - batch.length });
+      let processed = 0;
       for (const r of batch) {
         await generateAndSaveRecipeImage(r.id, r.title);
+        processed++;
       }
+      const remaining = Math.max(0, missing.length - processed);
+      console.log(`[admin] Batch done: ${processed} generated, ${remaining} still missing`);
+      res.json({ processed, remaining, total: missing.length });
     } catch (err) {
       console.error("Admin regenerate images error:", err);
       res.status(500).json({ message: "Failed to start regeneration" });

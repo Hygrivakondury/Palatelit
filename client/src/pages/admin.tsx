@@ -555,15 +555,51 @@ function ImageManagementSection() {
     queryKey: ["/api/admin/image-stats"],
   });
 
-  const generateMissingMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/regenerate-missing-images"),
-    onSuccess: async (res) => {
-      const data = await res.json();
+  // Self-resuming batch generator. Calls the endpoint 10-at-a-time in a loop
+  // until nothing is missing, refreshing stats after each batch. Survives a
+  // server restart mid-run because each call recomputes "missing" from the DB.
+  const [genRunning, setGenRunning] = useState(false);
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const runGenerateMissing = async () => {
+    if (genRunning) return;
+    setGenRunning(true);
+    setGenProgress(null);
+    let doneThisRun = 0;
+    let totalThisRun = 0;
+    try {
+      // keep going until the server reports nothing remaining
+      // (cap the number of rounds as a safety valve against an unexpected loop)
+      for (let round = 0; round < 500; round++) {
+        const res = await apiRequest("POST", "/api/admin/regenerate-missing-images", { limit: 10 });
+        const data = await res.json();
+        const processed = data.processed ?? 0;
+        const remaining = data.remaining ?? 0;
+        if (round === 0 && processed === 0 && remaining === 0) {
+          toast({ title: "All recipes have images!", description: "Nothing to generate." });
+          break;
+        }
+        doneThisRun += processed;
+        totalThisRun = doneThisRun + remaining;
+        setGenProgress({ done: doneThisRun, total: totalThisRun });
+        refetchStats();
+        if (remaining === 0) {
+          toast({ title: "Done!", description: `Generated ${doneThisRun} image(s).` });
+          break;
+        }
+        if (processed === 0) {
+          // nothing moved but some still missing — likely transient failures; stop to avoid a hot loop
+          toast({ title: "Paused", description: `${remaining} still without images. Click again to retry those.`, variant: "destructive" });
+          break;
+        }
+      }
+    } catch {
+      toast({ title: "Generation interrupted", description: "Click again to resume the remaining images.", variant: "destructive" });
+    } finally {
+      setGenRunning(false);
       refetchStats();
-      toast({ title: data.triggered === 0 ? "All recipes have images!" : "Generating images…", description: data.triggered === 0 ? "Nothing to generate." : `Started for ${data.triggered} recipe(s).` });
-    },
-    onError: () => toast({ title: "Failed to start generation", variant: "destructive" }),
-  });
+    }
+  };
 
   const scanMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/scan-and-fix-images"),
@@ -605,12 +641,18 @@ function ImageManagementSection() {
           <ImageIcon className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-semibold text-sm text-foreground">Generate Images for All Without Pictures</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Automatically generates AI images for every recipe without one. Runs in background.</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Generates AI images 10 at a time until every recipe has one. Keep this tab open while it runs — if it stops, just click again and it resumes from where it left off.</p>
           </div>
         </div>
-        <Button onClick={() => generateMissingMutation.mutate()} disabled={generateMissingMutation.isPending} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-generate-missing-images">
-          {generateMissingMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-          {generateMissingMutation.isPending ? "Starting…" : "Generate Missing Images"}
+        {genRunning && genProgress && (
+          <div className="flex items-center gap-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-800 px-4 py-3">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-600 flex-shrink-0" />
+            <p className="text-xs text-emerald-800 dark:text-emerald-300">Generating… {genProgress.done} of {genProgress.total} done this run. Images appear as they finish.</p>
+          </div>
+        )}
+        <Button onClick={runGenerateMissing} disabled={genRunning} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="button-generate-missing-images">
+          {genRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+          {genRunning ? (genProgress ? `Generating… ${genProgress.done}/${genProgress.total}` : "Starting…") : "Generate Missing Images"}
         </Button>
       </div>
 
