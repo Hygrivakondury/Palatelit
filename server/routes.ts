@@ -13,7 +13,13 @@ import { sendContributionEmail, sendFeedbackResponseEmail } from "./email";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  // Only use a custom base URL if one is explicitly set and non-empty.
+  // A stale/empty value (e.g. a leftover Replit AI proxy) points requests at a
+  // server that doesn't know real OpenAI models ("model gpt-image-1 does not
+  // exist"). When unset, the SDK defaults to https://api.openai.com.
+  ...(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+    ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL }
+    : {}),
 });
 
 const gemini = new GoogleGenAI({
