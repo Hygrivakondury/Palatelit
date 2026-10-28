@@ -588,8 +588,13 @@ function ImageManagementSection() {
           break;
         }
         if (processed === 0) {
-          // nothing moved but some still missing — likely transient failures; stop to avoid a hot loop
-          toast({ title: "Paused", description: `${remaining} still without images. Click again to retry those.`, variant: "destructive" });
+          // Every attempt in this batch failed — stop immediately instead of
+          // looping forever. Surface it so the real cause can be seen in logs.
+          toast({
+            title: "Image generation is failing",
+            description: `${remaining} recipe(s) still have no image, and this batch generated 0. Check the recipe-level “Regen Image” error for the reason.`,
+            variant: "destructive",
+          });
           break;
         }
       }

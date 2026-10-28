@@ -78,17 +78,21 @@ const upload = multer({
 
 // ─── AUTO IMAGE GENERATION HELPERS ────────────────────────────────────────
 
-async function generateAndSaveRecipeImage(id: number, title: string): Promise<void> {
+// Returns true only if an image was actually generated AND saved.
+// Callers can count real successes (not attempts) and stop a batch that is
+// failing every time instead of looping forever.
+async function generateAndSaveRecipeImage(id: number, title: string): Promise<boolean> {
   try {
-    const prompt = `A high-quality, realistic food photography photo of ${title}, an Indian vegetarian dish. 
-Beautifully plated on a traditional ceramic or copper serving dish, styled with garnishes like fresh coriander, 
-lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
+    const prompt = `A high-quality, realistic food photography photo of ${title}, an Indian vegetarian dish.
+Beautifully plated on a traditional ceramic or copper serving dish, styled with garnishes like fresh coriander,
+lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation.
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
     const imageResponse = await openaiImages.images.generate({
-      model: "gpt-image-1",
+      model: "dall-e-3",
       prompt,
       size: "1024x1024",
+      response_format: "b64_json",
     });
 
     const b64 = imageResponse.data[0]?.b64_json;
@@ -99,8 +103,10 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
     const imageUrl = `/api/recipes/${id}/image`;
     await storage.updateRecipeImage(id, imageUrl, b64);
     console.log(`[image] Auto-generated image for recipe ${id} (${title}) — saved to DB`);
+    return true;
   } catch (err) {
     console.error(`[image] Failed to auto-generate image for recipe ${id}:`, err);
+    return false;
   }
 }
 
@@ -1261,9 +1267,10 @@ lemon wedge, and relevant spices. Warm, natural lighting. Professional restauran
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
       const imageResponse = await openaiImages.images.generate({
-        model: "gpt-image-1",
+        model: "dall-e-3",
         prompt,
         size: "1024x1024",
+        response_format: "b64_json",
       });
 
       const b64 = imageResponse.data[0]?.b64_json;
@@ -1309,14 +1316,20 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 10;
       const batch = missing.slice(0, limit);
       console.log(`[admin] Generating images for ${batch.length} of ${missing.length} recipes without valid pictures`);
-      let processed = 0;
+      let processed = 0;   // real successes only
+      let failed = 0;
       for (const r of batch) {
-        await generateAndSaveRecipeImage(r.id, r.title);
-        processed++;
+        const ok = await generateAndSaveRecipeImage(r.id, r.title);
+        if (ok) processed++; else failed++;
       }
-      const remaining = Math.max(0, missing.length - processed);
-      console.log(`[admin] Batch done: ${processed} generated, ${remaining} still missing`);
-      res.json({ processed, remaining, total: missing.length });
+      // Re-count what's actually still missing from the DB (not arithmetic), so
+      // the number is always truthful even when generations fail.
+      const after = await storage.getRecipes("", "", "");
+      const remaining = after.filter((r) => !r.imageUrl).length;
+      console.log(`[admin] Batch done: ${processed} saved, ${failed} failed, ${remaining} still missing`);
+      // processed === 0 while failed > 0 tells the client every attempt failed,
+      // so it stops the loop instead of spinning.
+      res.json({ processed, failed, remaining, total: missing.length });
     } catch (err) {
       console.error("Admin regenerate images error:", err);
       res.status(500).json({ message: "Failed to start regeneration" });
