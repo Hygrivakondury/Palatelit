@@ -22,6 +22,15 @@ const openai = new OpenAI({
     : {}),
 });
 
+// Dedicated client for IMAGE generation. gpt-image-1 only exists on OpenAI's
+// own API — never on a proxy (the Replit AI proxy returns "model does not
+// exist"). So this client ALWAYS talks to api.openai.com, ignoring any
+// AI_INTEGRATIONS_OPENAI_BASE_URL that may still be set in the environment.
+const openaiImages = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: "https://api.openai.com/v1",
+});
+
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
   httpOptions: {
@@ -76,7 +85,7 @@ Beautifully plated on a traditional ceramic or copper serving dish, styled with 
 lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
-    const imageResponse = await openai.images.generate({
+    const imageResponse = await openaiImages.images.generate({
       model: "gpt-image-1",
       prompt,
       size: "1024x1024",
@@ -1251,7 +1260,7 @@ Beautifully plated on a traditional ceramic or copper serving dish, styled with 
 lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
-      const imageResponse = await openai.images.generate({
+      const imageResponse = await openaiImages.images.generate({
         model: "gpt-image-1",
         prompt,
         size: "1024x1024",
@@ -1267,7 +1276,10 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       res.json({ imageUrl, b64_json: b64, mimeType: "image/png" });
     } catch (err) {
       console.error("Image generation error:", err);
-      res.status(500).json({ message: "Failed to generate image" });
+      // Surface the real reason so the UI isn't blind (status + OpenAI message).
+      const detail = (err as any)?.error?.message || (err as any)?.message || "Unknown error";
+      const status = (err as any)?.status || (err as any)?.statusCode;
+      res.status(500).json({ message: `Image generation failed${status ? ` (${status})` : ""}: ${detail}` });
     }
   });
 

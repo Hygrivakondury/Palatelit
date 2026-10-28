@@ -2,11 +2,11 @@ import fs from "node:fs";
 import OpenAI, { toFile } from "openai";
 import { Buffer } from "node:buffer";
 
+// Image generation requires OpenAI's own API (gpt-image-1 does not exist on the
+// Replit AI proxy). Always target api.openai.com regardless of any base-URL env.
 export const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  ...(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
-    ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL }
-    : {}),
+  baseURL: "https://api.openai.com/v1",
 });
 
 /**
