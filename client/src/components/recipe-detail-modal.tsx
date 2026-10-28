@@ -158,7 +158,20 @@ export default function RecipeDetailModal({ recipe: initialRecipe, onClose, onRe
       queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
       toast({ title: "Image regenerated!", description: "New AI photo has been generated for this recipe." });
     },
-    onError: () => toast({ title: "Failed to regenerate image", variant: "destructive" }),
+    onError: (err: any) => {
+      // apiRequest throws Error("<status>: <body text>"), where body is our JSON
+      // { message }. Pull the message out so the real reason shows in the toast.
+      let detail: string = err?.message || "";
+      const jsonStart = detail.indexOf("{");
+      if (jsonStart >= 0) {
+        try { detail = JSON.parse(detail.slice(jsonStart))?.message || detail; } catch { /* keep raw */ }
+      }
+      toast({
+        title: "Failed to regenerate image",
+        description: detail || undefined,
+        variant: "destructive",
+      });
+    },
   });
 
   // Favorite state
