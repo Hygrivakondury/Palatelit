@@ -1,8 +1,8 @@
 import {
-  recipes, favorites, reviews, challenges, communityMessages, userProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
+  recipes, favorites, reviews, challenges, communityMessages, userProfiles, familyProfiles, pantryItems, mealPlans, shoppingChecked, affiliateLinks, userFeedback,
   blogPosts, blogComments, adSlots, siteContent, recipeTranslations,
   type Recipe, type InsertRecipe, type Review, type InsertReview, type Favorite,
-  type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile,
+  type Challenge, type InsertChallenge, type CommunityMessage, type UserProfile, type FamilyProfile,
   type PantryItem, type MealPlan, type MealType, type AffiliateLink, type AffiliateSlot, AFFILIATE_DEFAULTS, AFFILIATE_SLOTS,
   type UserFeedback, type BlogPost, type InsertBlogPost, type BlogComment, type AdSlot, type SiteContent,
 } from "@shared/schema";
@@ -40,6 +40,8 @@ export interface IStorage {
   // User Profiles
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
   upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
+  getFamilyProfile(userId: string): Promise<FamilyProfile | undefined>;
+  upsertFamilyProfile(userId: string, data: Partial<FamilyProfile>): Promise<FamilyProfile>;
   adminExists(): Promise<boolean>;
   claimAdmin(userId: string, displayName?: string): Promise<UserProfile>;
   // Pantry
@@ -282,6 +284,19 @@ export class DatabaseStorage implements IStorage {
     const [profile] = await db.insert(userProfiles)
       .values({ userId, ...data })
       .onConflictDoUpdate({ target: userProfiles.userId, set: data })
+      .returning();
+    return profile;
+  }
+
+  async getFamilyProfile(userId: string): Promise<FamilyProfile | undefined> {
+    const [profile] = await db.select().from(familyProfiles).where(eq(familyProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertFamilyProfile(userId: string, data: Partial<FamilyProfile>): Promise<FamilyProfile> {
+    const [profile] = await db.insert(familyProfiles)
+      .values({ userId, ...data, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: familyProfiles.userId, set: { ...data, updatedAt: new Date() } })
       .returning();
     return profile;
   }

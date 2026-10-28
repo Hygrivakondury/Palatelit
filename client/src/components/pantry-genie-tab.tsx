@@ -55,6 +55,41 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   const [expandedAiSteps, setExpandedAiSteps] = useState(false);
   const [recipeIdea, setRecipeIdea] = useState("");
 
+  // ── Fridge-suggestion filters ──
+  const [maxTotalTime, setMaxTotalTime] = useState<number>(0); // 0 = any, else 15/30/45
+  const [useFamilyProfile, setUseFamilyProfile] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+
+  // ── Family profile (diet / kid-friendly / allergies / servings) ──
+  type FamilyProfile = { diet: string; kidFriendly: boolean; excludeIngredients: string[]; servings: number };
+  const { data: familyProfile } = useQuery<FamilyProfile>({ queryKey: ["/api/family-profile"] });
+  const [profileDraft, setProfileDraft] = useState<FamilyProfile>({ diet: "", kidFriendly: false, excludeIngredients: [], servings: 4 });
+  const [excludeText, setExcludeText] = useState("");
+  useEffect(() => {
+    if (familyProfile) {
+      setProfileDraft(familyProfile);
+      setExcludeText((familyProfile.excludeIngredients ?? []).join(", "));
+    }
+  }, [familyProfile]);
+
+  const saveProfileMutation = useMutation({
+    mutationFn: async (p: FamilyProfile) => {
+      const res = await fetch("/api/family-profile", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(p),
+      });
+      if (!res.ok) throw new Error("Failed to save profile");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/family-profile"] });
+      setShowProfileEditor(false);
+      setUseFamilyProfile(true);
+    },
+  });
+
   // Camera modal state
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -222,11 +257,12 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
   });
 
   const suggestMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (filters: { maxTotalTime: number; useFamilyProfile: boolean }) => {
       const res = await fetch("/api/pantry/suggest", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(filters),
       });
       if (!res.ok) throw new Error("Failed to get suggestions");
       return res.json() as Promise<{ suggestions: RecipeSuggestion[] }>;
@@ -287,7 +323,7 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
 
   const handleFindRecipes = () => {
     setAiRecipe(null);
-    suggestMutation.mutate();
+    suggestMutation.mutate({ maxTotalTime, useFamilyProfile });
     generateAiRecipeMutation.mutate();
   };
 
@@ -719,6 +755,133 @@ export function PantryGenieTab({ onSelectRecipe }: PantryGenieTabProps) {
               Try a clearer, well-lit photo of your vegetables, fruits, or pantry items.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── Suggestion filters: quick time + family profile ── */}
+      {pantry.length > 0 && (
+        <div className="rounded-xl border bg-card p-4 space-y-3">
+          <p className="text-sm font-semibold text-foreground">Dinner in a hurry?</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { v: 0, label: "Any time" },
+              { v: 15, label: "≤ 15 min" },
+              { v: 30, label: "≤ 30 min" },
+              { v: 45, label: "≤ 45 min" },
+            ].map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                data-testid={`filter-time-${opt.v}`}
+                onClick={() => setMaxTotalTime(opt.v)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                  maxTotalTime === opt.v
+                    ? "bg-primary text-white border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                data-testid="toggle-family-profile"
+                checked={useFamilyProfile}
+                onChange={(e) => setUseFamilyProfile(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <span className="text-sm text-foreground">Use my family preferences</span>
+            </label>
+            <button
+              type="button"
+              data-testid="button-edit-profile"
+              onClick={() => setShowProfileEditor((s) => !s)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {showProfileEditor ? "Close" : "Edit"}
+            </button>
+          </div>
+
+          {/* Family profile editor */}
+          {showProfileEditor && (
+            <div className="rounded-lg border bg-background p-3 space-y-3 mt-1">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Diet</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { v: "", label: "No preference" },
+                    { v: "veg", label: "Pure veg" },
+                    { v: "jain", label: "Jain" },
+                    { v: "no-onion-garlic", label: "No onion-garlic" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setProfileDraft((p) => ({ ...p, diet: opt.v }))}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                        profileDraft.diet === opt.v
+                          ? "bg-primary text-white border-primary"
+                          : "bg-card text-muted-foreground border-border"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={profileDraft.kidFriendly}
+                  onChange={(e) => setProfileDraft((p) => ({ ...p, kidFriendly: e.target.checked }))}
+                  className="w-4 h-4 accent-primary"
+                />
+                <span className="text-sm text-foreground">Kid-friendly (milder dishes)</span>
+              </label>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Avoid these (allergies / dislikes)</p>
+                <Input
+                  value={excludeText}
+                  onChange={(e) => setExcludeText(e.target.value)}
+                  placeholder="e.g. peanuts, mushroom, eggplant"
+                  className="text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Recipes with these are hidden.</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Family size (servings)</p>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={profileDraft.servings}
+                  onChange={(e) => setProfileDraft((p) => ({ ...p, servings: Number(e.target.value) || 4 }))}
+                  className="text-sm w-24"
+                />
+              </div>
+
+              <Button
+                size="sm"
+                className="w-full bg-primary hover:bg-primary/90"
+                disabled={saveProfileMutation.isPending}
+                onClick={() =>
+                  saveProfileMutation.mutate({
+                    ...profileDraft,
+                    excludeIngredients: excludeText.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+                  })
+                }
+              >
+                {saveProfileMutation.isPending ? "Saving…" : "Save preferences"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

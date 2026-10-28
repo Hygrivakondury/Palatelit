@@ -94,6 +94,21 @@ export const userProfiles = pgTable("user_profiles", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Per-user family/cooking preferences — powers the fridge-photo suggestions.
+// One row per user. All fields optional with sensible defaults.
+export const familyProfiles = pgTable("family_profiles", {
+  userId: varchar("user_id").primaryKey(),
+  // diet: "" (none) | "veg" | "jain" | "no-onion-garlic"
+  diet: varchar("diet", { length: 20 }).notNull().default(""),
+  kidFriendly: boolean("kid_friendly").notNull().default(false),
+  // comma-separated ingredients/allergens to exclude, lowercase
+  excludeIngredients: text("exclude_ingredients").array().notNull().default([]),
+  servings: integer("servings").notNull().default(4),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type FamilyProfile = typeof familyProfiles.$inferSelect;
+
 export const recipesRelations = relations(recipes, ({ many }) => ({
   favorites: many(favorites),
   reviews: many(reviews),

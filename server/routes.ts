@@ -882,6 +882,37 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
     }
   });
 
+  // ─── FAMILY PROFILE (powers fridge-photo suggestions) ──────────────────
+  app.get("/api/family-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const profile = await storage.getFamilyProfile(req.user.claims.sub);
+      // return defaults if none saved yet
+      res.json(profile ?? { diet: "", kidFriendly: false, excludeIngredients: [], servings: 4 });
+    } catch (err) {
+      console.error("Get family profile error:", err);
+      res.status(500).json({ message: "Failed to load profile" });
+    }
+  });
+
+  app.put("/api/family-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const body = req.body ?? {};
+      const diet = ["", "veg", "jain", "no-onion-garlic"].includes(body.diet) ? body.diet : "";
+      const kidFriendly = Boolean(body.kidFriendly);
+      const excludeIngredients = Array.isArray(body.excludeIngredients)
+        ? body.excludeIngredients.map((s: any) => String(s).trim().toLowerCase()).filter(Boolean).slice(0, 30)
+        : [];
+      const servings = Math.min(20, Math.max(1, Number(body.servings) || 4));
+      const saved = await storage.upsertFamilyProfile(req.user.claims.sub, {
+        diet, kidFriendly, excludeIngredients, servings,
+      });
+      res.json(saved);
+    } catch (err) {
+      console.error("Save family profile error:", err);
+      res.status(500).json({ message: "Failed to save profile" });
+    }
+  });
+
   app.post("/api/pantry/suggest", isAuthenticated, async (req: any, res) => {
     try {
       const pantry = await storage.getPantryItems(req.user.claims.sub);
@@ -889,7 +920,51 @@ Do NOT wrap the JSON in markdown code fences. Return raw JSON only.`,
         return res.json({ suggestions: [] });
       }
       const pantrySet = new Set(pantry.map((p) => p.name.toLowerCase()));
-      const allRecipes = await storage.getRecipes();
+      let allRecipes = await storage.getRecipes();
+
+      // ── Filters from request body (all optional) ──
+      // maxTotalTime: 15 | 30 | 45 | 0/undefined (no limit)
+      // useFamilyProfile: boolean — apply the user's saved family preferences
+      const maxTotalTime = Number(req.body?.maxTotalTime) || 0;
+      const useFamilyProfile = Boolean(req.body?.useFamilyProfile);
+
+      if (maxTotalTime > 0) {
+        allRecipes = allRecipes.filter(
+          (r) => (r.prepTime + r.cookTime) <= maxTotalTime
+        );
+      }
+
+      if (useFamilyProfile) {
+        const fp = await storage.getFamilyProfile(req.user.claims.sub);
+        if (fp) {
+          // Diet: veg = any vegetarian (all recipes are veg here, so no-op safety);
+          // jain / no-onion-garlic both map to the "Jain Friendly" tag, which by
+          // definition excludes onion & garlic.
+          if (fp.diet === "jain" || fp.diet === "no-onion-garlic") {
+            allRecipes = allRecipes.filter((r) =>
+              (r.dietaryTags ?? []).includes("Jain Friendly")
+            );
+          }
+          // Allergies / excluded ingredients: hide any recipe listing them.
+          if (fp.excludeIngredients && fp.excludeIngredients.length) {
+            allRecipes = allRecipes.filter((r) => {
+              const blob = r.ingredients.join(" ").toLowerCase();
+              return !fp.excludeIngredients.some((ex) => ex && blob.includes(ex));
+            });
+          }
+          // Kid-friendly (heuristic — no structured data exists): bias away from
+          // recipes whose ingredients read as very hot/spicy.
+          if (fp.kidFriendly) {
+            const HOT = ["red chilli", "green chilli", "bhut jolokia", "ghost pepper",
+              "extra hot", "very spicy", "guntur", "byadgi", "spicy"];
+            allRecipes = allRecipes.filter((r) => {
+              const blob = (r.title + " " + r.ingredients.join(" ") + " " + (r.description ?? "")).toLowerCase();
+              const hits = HOT.filter((h) => blob.includes(h)).length;
+              return hits < 2; // allow a little heat, drop the clearly fiery ones
+            });
+          }
+        }
+      }
 
       const scored = allRecipes.map((recipe) => {
         let matches = 0;
