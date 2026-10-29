@@ -829,6 +829,23 @@ function BlogManagementSection() {
     onError: () => toast({ title: "Failed to toggle publish", variant: "destructive" }),
   });
 
+  // AI-generate a cover image for the post being edited (Gemini).
+  const [coverBust, setCoverBust] = useState(0); // cache-bust the preview after regen
+  const generateCoverMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/blog/${id}/generate-cover`),
+    onSuccess: () => {
+      setCoverBust(Date.now());
+      queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
+      toast({ title: "Cover image generated!", description: "A new AI cover photo was created for this post." });
+    },
+    onError: (err: any) => {
+      let detail = err?.message || "";
+      const j = detail.indexOf("{");
+      if (j >= 0) { try { detail = JSON.parse(detail.slice(j))?.message || detail; } catch {} }
+      toast({ title: "Failed to generate cover", description: detail || undefined, variant: "destructive" });
+    },
+  });
+
   const isEditorOpen = creating || !!editing;
 
   return (
@@ -903,6 +920,34 @@ function BlogManagementSection() {
             </Button>
             <Button variant="outline" onClick={() => { setEditing(null); setCreating(false); }}>Cancel</Button>
           </div>
+
+          {/* Cover image — only for existing posts (needs an id to generate against) */}
+          {editing && (
+            <div className="rounded-lg border bg-background p-3 space-y-2 mt-2">
+              <p className="text-xs font-semibold text-muted-foreground">Cover image</p>
+              {(editing.coverImageData || coverBust) ? (
+                <img
+                  src={`/api/blog/${editing.id}/cover?v=${coverBust || 1}`}
+                  alt="Cover"
+                  className="w-full max-h-44 object-cover rounded-md border"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">No cover image yet.</p>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={generateCoverMutation.isPending}
+                onClick={() => generateCoverMutation.mutate(editing.id)}
+                data-testid="button-generate-cover"
+              >
+                {generateCoverMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                {generateCoverMutation.isPending ? "Generating…" : (editing.coverImageData ? "Regenerate cover" : "Generate cover image")}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

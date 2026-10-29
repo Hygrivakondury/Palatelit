@@ -1700,6 +1700,46 @@ Keep responses concise (3-5 sentences unless a recipe is requested). Use bullet 
     }
   });
 
+  // Serve a blog post's cover image (base64 stored in coverImageData).
+  app.get("/api/blog/:id/cover", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(404).send("Not found");
+      const post = await storage.getBlogPost(id);
+      if (!post?.coverImageData) return res.status(404).send("No image");
+      const buffer = Buffer.from(post.coverImageData, "base64");
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).send("Error");
+    }
+  });
+
+  // Admin: AI-generate a cover image for a blog post (Gemini).
+  app.post("/api/blog/:id/generate-cover", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
+      const id = parseInt(req.params.id);
+      const post = await storage.getBlogPost(id);
+      if (!post) return res.status(404).json({ message: "Post not found" });
+
+      const prompt = `A warm, appetising editorial photo for an Indian vegetarian cooking article titled "${post.title}".
+Styled Indian food photography — fresh ingredients, spices, traditional cookware, natural lighting, clean background.
+Photorealistic, magazine quality. No text, no words in the image.`;
+
+      const b64 = await generateImageB64ViaGemini(prompt);
+      if (!b64) return res.status(500).json({ message: "No image returned" });
+
+      await storage.updateBlogPost(id, { coverImageData: b64 });
+      res.json({ success: true, coverUrl: `/api/blog/${id}/cover` });
+    } catch (err) {
+      console.error("Blog cover generation error:", err);
+      const detail = (err as any)?.error?.message || (err as any)?.message || "Unknown error";
+      res.status(500).json({ message: `Cover generation failed: ${detail}` });
+    }
+  });
+
   app.post("/api/blog", isAuthenticated, async (req: any, res) => {
     try {
       if (!isAdminEmail(req.user?.claims?.email)) return res.status(403).json({ message: "Admin only" });
