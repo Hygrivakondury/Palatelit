@@ -39,6 +39,13 @@ const gemini = new GoogleGenAI({
   },
 });
 
+// Dedicated Gemini client for IMAGE generation, pointed straight at Google
+// (never the Replit proxy base URL). Uses the same API key. Image generation
+// uses gemini-2.5-flash-image via generateContent with IMAGE response modality.
+const geminiImages = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+});
+
 const COMMON_SPICES = new Set([
   "cumin", "cumin seeds", "jeera", "garam masala", "coriander powder", "turmeric",
   "turmeric powder", "red chilli powder", "chilli powder", "mustard seeds", "curry leaves",
@@ -78,18 +85,21 @@ const upload = multer({
 
 // ─── AUTO IMAGE GENERATION HELPERS ────────────────────────────────────────
 
-// dall-e-3 returns an image URL by default (and only returns b64_json when the
-// SDK/endpoint accepts response_format, which this one rejects). This helper
-// handles BOTH shapes: use inline base64 if present, else download the URL and
-// base64-encode it ourselves. That way image saving works regardless.
-async function extractImageBase64(imageResponse: any): Promise<string | null> {
-  const item = imageResponse?.data?.[0];
-  if (item?.b64_json) return item.b64_json;
-  if (item?.url) {
-    const resp = await fetch(item.url);
-    if (!resp.ok) throw new Error(`Failed to download generated image: ${resp.status}`);
-    const buf = Buffer.from(await resp.arrayBuffer());
-    return buf.toString("base64");
+// Generate a recipe image with Google Gemini (gemini-2.5-flash-image) and
+// return it as base64 PNG data. Uses generateContent with IMAGE response
+// modality — the image comes back as an inlineData part.
+async function generateImageB64ViaGemini(prompt: string): Promise<string | null> {
+  const response: any = await geminiImages.models.generateContent({
+    model: "gemini-2.5-flash-image",
+    contents: prompt,
+    config: {
+      responseModalities: ["IMAGE"],
+    },
+  });
+  const parts = response?.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    const data = part?.inlineData?.data;
+    if (data) return data; // already base64
   }
   return null;
 }
@@ -104,13 +114,7 @@ Beautifully plated on a traditional ceramic or copper serving dish, styled with 
 lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation.
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
-    const imageResponse = await openaiImages.images.generate({
-      model: "dall-e-3",
-      prompt,
-      size: "1024x1024",
-    });
-
-    const b64 = await extractImageBase64(imageResponse);
+    const b64 = await generateImageB64ViaGemini(prompt);
     if (!b64) throw new Error("No image data returned");
 
     // Store raw base64 in imageData column, serve through a dedicated route.
@@ -1281,13 +1285,7 @@ Beautifully plated on a traditional ceramic or copper serving dish, styled with 
 lemon wedge, and relevant spices. Warm, natural lighting. Professional restaurant-quality presentation. 
 Shot from slightly above, clean background. Photorealistic, appetising.`;
 
-      const imageResponse = await openaiImages.images.generate({
-        model: "dall-e-3",
-        prompt,
-        size: "1024x1024",
-      });
-
-      const b64 = await extractImageBase64(imageResponse);
+      const b64 = await generateImageB64ViaGemini(prompt);
       if (!b64) return res.status(500).json({ message: "No image returned" });
 
       // Store raw base64 in imageData column, serve through dedicated route
