@@ -78,6 +78,22 @@ const upload = multer({
 
 // ─── AUTO IMAGE GENERATION HELPERS ────────────────────────────────────────
 
+// dall-e-3 returns an image URL by default (and only returns b64_json when the
+// SDK/endpoint accepts response_format, which this one rejects). This helper
+// handles BOTH shapes: use inline base64 if present, else download the URL and
+// base64-encode it ourselves. That way image saving works regardless.
+async function extractImageBase64(imageResponse: any): Promise<string | null> {
+  const item = imageResponse?.data?.[0];
+  if (item?.b64_json) return item.b64_json;
+  if (item?.url) {
+    const resp = await fetch(item.url);
+    if (!resp.ok) throw new Error(`Failed to download generated image: ${resp.status}`);
+    const buf = Buffer.from(await resp.arrayBuffer());
+    return buf.toString("base64");
+  }
+  return null;
+}
+
 // Returns true only if an image was actually generated AND saved.
 // Callers can count real successes (not attempts) and stop a batch that is
 // failing every time instead of looping forever.
@@ -92,10 +108,9 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
       model: "dall-e-3",
       prompt,
       size: "1024x1024",
-      response_format: "b64_json",
     });
 
-    const b64 = imageResponse.data[0]?.b64_json;
+    const b64 = await extractImageBase64(imageResponse);
     if (!b64) throw new Error("No image data returned");
 
     // Store raw base64 in imageData column, serve through a dedicated route.
@@ -1270,10 +1285,9 @@ Shot from slightly above, clean background. Photorealistic, appetising.`;
         model: "dall-e-3",
         prompt,
         size: "1024x1024",
-        response_format: "b64_json",
       });
 
-      const b64 = imageResponse.data[0]?.b64_json;
+      const b64 = await extractImageBase64(imageResponse);
       if (!b64) return res.status(500).json({ message: "No image returned" });
 
       // Store raw base64 in imageData column, serve through dedicated route
